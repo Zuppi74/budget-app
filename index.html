@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Budget-App</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+
+  <header class="topbar">
+    <h1>Budget-App</h1>
+    <div class="toolbar">
+      <button id="btn-undo" class="toolbar-btn" disabled>↺ Rückgängig</button>
+      <button id="btn-redo" class="toolbar-btn" disabled>↻ Wiederholen</button>
+      <button id="btn-recent-moves" class="toolbar-btn">Letzte Änderungen</button>
+      <button id="btn-export" class="toolbar-btn">Exportieren</button>
+      <button id="btn-import" class="toolbar-btn">Importieren</button>
+      <input type="file" id="import-file-input" accept="application/json" class="hidden">
+      <button id="btn-settings" class="icon-btn" title="Einnahmen-Kategorien verwalten" aria-label="Einnahmen-Kategorien verwalten">⚙</button>
+    </div>
+  </header>
+
+  <nav class="month-nav">
+    <button id="btn-prev-month" class="nav-btn" aria-label="Vorheriger Monat">‹</button>
+    <div id="current-month" class="current-month">Monat Jahr</div>
+    <button id="btn-next-month" class="nav-btn" aria-label="Nächster Monat">›</button>
+  </nav>
+
+  <div class="view-tabs">
+    <button class="tab-btn active" data-view="overview">Übersicht</button>
+    <button class="tab-btn" data-view="capture">Erfassung</button>
+    <button class="tab-btn" data-view="budget">Budget</button>
+    <button class="tab-btn" data-view="accounts">Konten</button>
+    <button class="tab-btn" data-view="report">Auswertung</button>
+  </div>
+
+  <section class="summary">
+    <div class="summary-card income">
+      <span class="summary-label">Einnahmen</span>
+      <span id="sum-income" class="summary-value">CHF 0.00</span>
+    </div>
+    <div class="summary-card expense">
+      <span class="summary-label">Ausgaben</span>
+      <span id="sum-expense" class="summary-value">CHF 0.00</span>
+    </div>
+    <div class="summary-card balance">
+      <span class="summary-label">Saldo</span>
+      <span id="sum-balance" class="summary-value">CHF 0.00</span>
+    </div>
+  </section>
+
+  <main class="content">
+
+    <div class="side-panels">
+
+      <section class="panel accounts-summary-panel">
+        <div class="panel-header">
+          <h2>Kontostände</h2>
+        </div>
+        <div id="account-balances-list" class="account-balances-list"></div>
+      </section>
+
+      <section class="panel bar-panel">
+        <div class="panel-header">
+          <h2>Einnahmen vs. Ausgaben</h2>
+        </div>
+        <div id="bar-chart-container" class="bar-chart-container">
+          <p class="empty-hint">Keine Einträge in diesem Monat.</p>
+        </div>
+      </section>
+
+      <section class="panel chart-panel">
+        <div class="panel-header">
+          <h2>Ausgaben nach Kategorie</h2>
+        </div>
+        <div id="chart-container" class="chart-container">
+          <p class="empty-hint">Keine Ausgaben in diesem Monat.</p>
+        </div>
+      </section>
+
+      <section class="panel chart-panel">
+        <div class="panel-header">
+          <h2>Ausgaben nach Label</h2>
+        </div>
+        <div id="label-chart-container" class="chart-container">
+          <p class="empty-hint">Keine Ausgaben mit Label in diesem Monat.</p>
+        </div>
+      </section>
+
+    </div>
+
+  </main>
+
+  <section id="capture-view" class="capture-view hidden">
+    <section class="panel entries-panel">
+      <div class="panel-header">
+        <h2>Einträge</h2>
+        <button id="btn-add-entry" class="btn-primary">+ Eintrag</button>
+      </div>
+      <div id="entries-list" class="entries-list">
+        <p class="empty-hint">Keine Einträge in diesem Monat.</p>
+      </div>
+    </section>
+  </section>
+
+  <section id="budget-view" class="budget-view hidden">
+    <div class="budget-summary">
+      <span class="summary-label">Budgetiert diesen Monat</span>
+      <span id="budget-total" class="summary-value">CHF 0.00</span>
+    </div>
+    <div id="budget-groups"></div>
+    <div class="budget-add-group">
+      <input type="text" id="new-group-name" placeholder="Neue Kategorie-Gruppe">
+      <button type="button" id="btn-add-group" class="btn-secondary">+ Kategorie-Gruppe</button>
+    </div>
+  </section>
+
+  <section id="accounts-view" class="accounts-view hidden">
+    <div class="budget-summary">
+      <span class="summary-label">Gesamtvermögen</span>
+      <span id="accounts-total" class="summary-value">CHF 0.00</span>
+    </div>
+    <div id="accounts-list" class="accounts-list"></div>
+    <div class="account-add panel">
+      <h2>Konto hinzufügen</h2>
+      <div class="account-add-fields">
+        <input type="text" id="new-account-name" placeholder="Name (z. B. UBS Lohnkonto)">
+        <input type="text" id="new-account-type" list="account-type-options" placeholder="Kontotyp">
+        <input type="number" id="new-account-balance" step="0.01" placeholder="Startguthaben (CHF)">
+        <button type="button" id="btn-add-account" class="btn-primary">+ Konto</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="report-view" class="report-view hidden">
+    <nav class="year-nav">
+      <button id="btn-prev-year" class="nav-btn" aria-label="Vorheriges Jahr">‹</button>
+      <div id="current-year" class="current-month">Jahr</div>
+      <button id="btn-next-year" class="nav-btn" aria-label="Nächstes Jahr">›</button>
+    </nav>
+    <div class="panel report-panel">
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th>Monat</th>
+            <th>Einnahmen</th>
+            <th>Ausgaben</th>
+            <th>Saldo</th>
+          </tr>
+        </thead>
+        <tbody id="report-table-body"></tbody>
+        <tfoot id="report-table-foot"></tfoot>
+      </table>
+    </div>
+
+    <h3 class="report-section-title">Ausgaben nach Kategorie</h3>
+    <div class="panel report-panel">
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th>Kategorie</th>
+            <th>Ausgaben</th>
+            <th>Anteil</th>
+          </tr>
+        </thead>
+        <tbody id="report-category-body"></tbody>
+        <tfoot id="report-category-foot"></tfoot>
+      </table>
+    </div>
+  </section>
+
+  <datalist id="account-type-options">
+    <option value="Lohnkonto">
+    <option value="Sparkonto">
+    <option value="Kreditkarte">
+    <option value="Bargeld">
+    <option value="Krypto">
+    <option value="Investment">
+    <option value="Sonstiges">
+  </datalist>
+
+</div>
+
+<div id="entry-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="entry-modal-title">Eintrag hinzufügen</h3>
+      <button class="icon-btn modal-close" data-close="entry-modal" aria-label="Schließen">✕</button>
+    </div>
+    <form id="entry-form">
+      <input type="hidden" id="entry-id">
+
+      <div class="type-toggle">
+        <button type="button" class="type-btn active" data-type="expense">Ausgabe</button>
+        <button type="button" class="type-btn" data-type="income">Einnahme</button>
+      </div>
+
+      <label for="entry-amount">Betrag (CHF)</label>
+      <input type="number" id="entry-amount" step="0.01" min="0" placeholder="0,00" required>
+
+      <label for="entry-category">Kategorie</label>
+      <select id="entry-category" required></select>
+
+      <label for="entry-account">Konto</label>
+      <select id="entry-account" required></select>
+
+      <label for="entry-date">Datum</label>
+      <input type="date" id="entry-date" required>
+
+      <label for="entry-label">Label</label>
+      <input type="text" id="entry-label" list="label-options" placeholder="Optional, z. B. Urlaub">
+      <datalist id="label-options"></datalist>
+
+      <label for="entry-note">Notiz</label>
+      <input type="text" id="entry-note" placeholder="Optional">
+
+      <div class="modal-actions">
+        <button type="button" id="btn-delete-entry" class="btn-danger hidden">Löschen</button>
+        <button type="submit" class="btn-primary">Speichern</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="icon-picker-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Icon wählen</h3>
+      <button class="icon-btn modal-close" data-close="icon-picker-modal" aria-label="Schließen">✕</button>
+    </div>
+    <div id="icon-picker-grid" class="icon-picker-grid"></div>
+    <div class="modal-actions">
+      <button type="button" id="btn-clear-icon" class="btn-secondary">Kein Icon</button>
+    </div>
+  </div>
+</div>
+
+<div id="settings-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Einnahmen-Kategorien verwalten</h3>
+      <button class="icon-btn modal-close" data-close="settings-modal" aria-label="Schließen">✕</button>
+    </div>
+    <div class="settings-body">
+      <div class="category-group">
+        <ul id="category-list-income" class="category-list"></ul>
+        <div class="category-add">
+          <input type="text" id="new-category-income" placeholder="Neue Kategorie">
+          <button type="button" class="btn-secondary" data-add-income-category>Hinzufügen</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="recent-moves-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Letzte Änderungen</h3>
+      <button class="icon-btn modal-close" data-close="recent-moves-modal" aria-label="Schließen">✕</button>
+    </div>
+    <ul id="recent-moves-list" class="recent-moves-list"></ul>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
