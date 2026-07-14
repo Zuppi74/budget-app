@@ -873,6 +873,12 @@ body {
   margin-top: 4px;
 }
 
+.budget-cat-remaining {
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-top: 4px;
+}
+
 .inline-edit-input {
   padding: 3px 6px;
   border: 1px solid var(--accent);

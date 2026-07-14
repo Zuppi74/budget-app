@@ -586,24 +586,23 @@ function renderCategoryRowHtml(cat, entries) {
   const budget = getBudget(cat.id, state.year, state.month);
   const rollover = getRolloverForMonth(cat.id, state.year, state.month);
   const available = budget + rollover;
+  const remaining = available - spent;
+  const overspent = remaining < 0;
   const pct = available > 0 ? Math.min(spent / available, 1) * 100 : (spent > 0 ? 100 : 0);
-  const overspent = available > 0 ? spent > available : spent > 0;
-
-  let status = '';
-  if (available === 0) {
-    status = spent > 0 ? `${formatCurrency(spent)} ausgegeben` : '';
-  } else if (spent === 0) {
-    status = `Verfügbar: ${formatCurrency(available)}`;
-  } else if (spent < available) {
-    status = `${formatCurrency(spent)} von ${formatCurrency(available)} ausgegeben`;
-  } else if (spent === available) {
-    status = 'Budget ausgeschöpft';
-  } else {
-    status = `${formatCurrency(spent)} von ${formatCurrency(available)} – überschritten`;
-  }
 
   const rolloverNote = rollover > 0
     ? `<div class="budget-cat-rollover">+ ${formatCurrency(rollover)} aus Vormonat übertragen</div>`
+    : '';
+
+  let remainingLine = '';
+  if (available !== 0 || spent !== 0) {
+    const label = overspent ? 'Überzogen um' : 'Aktuell verfügbar';
+    const color = overspent ? 'var(--expense)' : 'var(--income)';
+    remainingLine = `<div class="budget-cat-remaining" style="color:${color}">${label}: ${formatCurrency(Math.abs(remaining))}</div>`;
+  }
+
+  const spentLine = spent > 0
+    ? `<div class="budget-cat-status">${formatCurrency(spent)} von ${formatCurrency(available)} ausgegeben</div>`
     : '';
 
   const iconDisplay = cat.icon || '+';
@@ -621,7 +620,8 @@ function renderCategoryRowHtml(cat, entries) {
         <div class="budget-bar-fill ${overspent ? 'overspent' : ''}" style="width:${pct}%"></div>
       </div>
       ${rolloverNote}
-      ${status ? `<div class="budget-cat-status">${status}</div>` : ''}
+      ${remainingLine}
+      ${spentLine}
     </div>`;
 }
 
