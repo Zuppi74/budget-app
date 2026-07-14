@@ -216,6 +216,60 @@ body {
   .summary { grid-template-columns: 1fr; }
 }
 
+@media (max-width: 600px) {
+  body { overflow-x: hidden; }
+
+  .app { padding: 16px 12px 40px; }
+
+  .topbar {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+
+  .topbar h1 { font-size: 1.25rem; }
+
+  .toolbar {
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    width: 100%;
+  }
+
+  .toolbar-btn { font-size: 0.78rem; }
+
+  .month-nav { gap: 12px; margin-bottom: 16px; }
+
+  .current-month { font-size: 1rem; min-width: 140px; }
+
+  .view-tabs {
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    margin: 0 -12px 16px;
+    padding: 0 12px 4px;
+  }
+
+  .view-tabs::-webkit-scrollbar { display: none; }
+
+  .tab-btn {
+    flex-shrink: 0;
+    padding: 8px 14px;
+    font-size: 0.85rem;
+  }
+
+  .report-panel { overflow-x: auto; }
+
+  .report-table { font-size: 0.82rem; }
+
+  .report-table th,
+  .report-table td { padding: 8px 10px; white-space: nowrap; }
+
+  .modal { max-width: none; width: calc(100% - 24px); padding: 16px; }
+
+  .account-add-fields input { min-width: 0; }
+}
+
 .panel {
   background: var(--surface);
   border: 1px solid var(--border);
