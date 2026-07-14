@@ -41,6 +41,7 @@ const DEFAULT_DATA = {
     { id: 'acc-lohnkonto', name: 'Lohnkonto', type: 'Lohnkonto', balance: 0 }
   ],
   entries: [],
+  recurring: [],
   recentMoves: []
 };
 
@@ -104,7 +105,7 @@ function migrateOldData(old) {
     }
     return e;
   });
-  return ensureAccounts({ categoryGroups, incomeCategories, budgets: {}, entries, recentMoves: [] });
+  return ensureAccounts({ categoryGroups, incomeCategories, budgets: {}, entries, recurring: [], recentMoves: [] });
 }
 
 function loadData() {
@@ -115,6 +116,7 @@ function loadData() {
       if (parsed.categoryGroups) {
         parsed.budgets = parsed.budgets || {};
         parsed.recentMoves = parsed.recentMoves || [];
+        parsed.recurring = parsed.recurring || [];
         return ensureAccounts(parsed);
       }
     }
@@ -292,6 +294,33 @@ function carryForwardBudgets() {
   }
 }
 
+function daysInMonth(year, month) {
+  return new Date(year, month + 1, 0).getDate();
+}
+
+function generateRecurringEntriesForMonth(year, month) {
+  if (!data.recurring || data.recurring.length === 0) return;
+  const key = monthKey(year, month);
+  let changed = false;
+
+  data.recurring.forEach(r => {
+    if (!r.active) return;
+    if (key < r.startMonth) return;
+    const alreadyExists = data.entries.some(e => e.recurringId === r.id && e.date.slice(0, 7) === key);
+    if (alreadyExists) return;
+
+    const day = Math.min(r.dayOfMonth, daysInMonth(year, month));
+    const date = `${key}-${String(day).padStart(2, '0')}`;
+    data.entries.push({
+      id: uid(), type: r.type, amount: r.amount, category: r.category, account: r.account,
+      label: r.label, note: r.note, date, recurringId: r.id
+    });
+    changed = true;
+  });
+
+  if (changed) saveData();
+}
+
 function getEntriesForCurrentMonth() {
   return data.entries.filter(e => {
     const d = new Date(e.date + 'T00:00:00');
@@ -333,6 +362,7 @@ function renderEntries(entries) {
     const meta = metaParts.join(' · ');
     const sign = e.type === 'income' ? '+' : '−';
     const labelTag = e.label ? `<span class="entry-label-tag">${escapeHtml(e.label)}</span>` : '';
+    const recurringBadge = e.recurringId ? `<span class="entry-recurring-badge" title="Wiederkehrende Buchung">↻</span>` : '';
     const icon = e.type === 'expense' ? getCategoryIcon(e.category) : '';
     const iconEl = icon ? `<span class="entry-icon">${icon}</span>` : '';
     return `
@@ -342,6 +372,7 @@ function renderEntries(entries) {
           <span class="entry-category-row">
             <span class="entry-category">${escapeHtml(getEntryCategoryLabel(e))}</span>
             ${labelTag}
+            ${recurringBadge}
           </span>
           <span class="entry-meta">${meta}</span>
         </div>
@@ -1062,6 +1093,10 @@ function openEntryModal(entryId) {
   populateAccountSelect();
   populateLabelOptions();
 
+  const recurringRow = document.getElementById('entry-recurring-row');
+  const recurringHint = document.getElementById('entry-recurring-hint');
+  document.getElementById('entry-recurring').checked = false;
+
   if (entryId) {
     const entry = data.entries.find(e => e.id === entryId);
     if (!entry) return;
@@ -1075,6 +1110,8 @@ function openEntryModal(entryId) {
     document.getElementById('entry-label').value = entry.label || '';
     document.getElementById('entry-note').value = entry.note || '';
     deleteBtn.classList.remove('hidden');
+    recurringRow.classList.add('hidden');
+    recurringHint.classList.toggle('hidden', !entry.recurringId);
   } else {
     document.getElementById('entry-modal-title').textContent = 'Eintrag hinzufügen';
     document.getElementById('entry-id').value = '';
@@ -1082,6 +1119,8 @@ function openEntryModal(entryId) {
     const d = new Date(state.year, state.month, Math.min(today.getDate(), new Date(state.year, state.month + 1, 0).getDate()));
     document.getElementById('entry-date').value = d.toISOString().slice(0, 10);
     deleteBtn.classList.add('hidden');
+    recurringRow.classList.remove('hidden');
+    recurringHint.classList.add('hidden');
   }
 
   openModal('entry-modal');
@@ -1101,11 +1140,22 @@ function handleEntryFormSubmit(e) {
 
   const typeLabel = state.currentType === 'income' ? 'Einnahme' : 'Ausgabe';
   const catLabel = state.currentType === 'expense' ? getCategoryName(category) : category;
+  const isRecurring = !id && document.getElementById('entry-recurring').checked;
 
   if (id) {
     mutate(`${typeLabel} "${catLabel}" bearbeitet (${formatCurrency(amount)})`, () => {
       const entry = data.entries.find(x => x.id === id);
       Object.assign(entry, { type: state.currentType, amount, category, account, date, label, note });
+    });
+  } else if (isRecurring) {
+    mutate(`Wiederkehrende ${typeLabel} "${catLabel}" angelegt (${formatCurrency(amount)}, monatlich)`, () => {
+      const recurringId = uid();
+      const day = new Date(date + 'T00:00:00').getDate();
+      data.recurring.push({
+        id: recurringId, type: state.currentType, amount, category, account, label, note,
+        dayOfMonth: day, startMonth: date.slice(0, 7), active: true
+      });
+      data.entries.push({ id: uid(), type: state.currentType, amount, category, account, date, label, note, recurringId });
     });
   } else {
     mutate(`${typeLabel} "${catLabel}" hinzugefügt (${formatCurrency(amount)})`, () => {
@@ -1173,6 +1223,62 @@ function renderRecentMoves() {
     </li>`).join('');
 }
 
+function getRecurringLabel(r) {
+  const catLabel = r.type === 'expense' ? getCategoryDisplayName(r.category) : r.category;
+  return catLabel;
+}
+
+function renderRecurringList() {
+  const container = document.getElementById('recurring-list');
+  const items = data.recurring || [];
+  if (items.length === 0) {
+    container.innerHTML = '<p class="empty-hint">Noch keine wiederkehrenden Buchungen angelegt.</p>';
+    return;
+  }
+
+  container.innerHTML = items.map(r => {
+    const sign = r.type === 'income' ? '+' : '−';
+    const accountName = getAccountName(r.account);
+    return `
+      <div class="recurring-item ${r.active ? '' : 'paused'}" data-id="${r.id}">
+        <div class="recurring-info">
+          <span class="recurring-name">${escapeHtml(getRecurringLabel(r))}</span>
+          <span class="recurring-meta">Jeden ${r.dayOfMonth}. · ${escapeHtml(accountName)}${r.active ? '' : ' · pausiert'}</span>
+        </div>
+        <span class="recurring-amount ${r.type}">${sign} ${formatCurrency(r.amount)}</span>
+        <div class="recurring-actions">
+          <button type="button" class="icon-btn small" data-toggle-recurring="${r.id}" title="${r.active ? 'Pausieren' : 'Fortsetzen'}">${r.active ? '⏸' : '▶'}</button>
+          <button type="button" class="icon-btn small" data-delete-recurring="${r.id}" aria-label="Löschen">✕</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  container.querySelectorAll('[data-toggle-recurring]').forEach(btn => {
+    btn.addEventListener('click', () => toggleRecurringActive(btn.dataset.toggleRecurring));
+  });
+  container.querySelectorAll('[data-delete-recurring]').forEach(btn => {
+    btn.addEventListener('click', () => deleteRecurringTemplate(btn.dataset.deleteRecurring));
+  });
+}
+
+function toggleRecurringActive(id) {
+  const r = data.recurring.find(x => x.id === id);
+  if (!r) return;
+  mutate(`Wiederkehrende Buchung "${getRecurringLabel(r)}" ${r.active ? 'pausiert' : 'fortgesetzt'}`, () => {
+    r.active = !r.active;
+  });
+  renderRecurringList();
+}
+
+function deleteRecurringTemplate(id) {
+  const r = data.recurring.find(x => x.id === id);
+  if (!r) return;
+  mutate(`Wiederkehrende Buchung "${getRecurringLabel(r)}" gelöscht`, () => {
+    data.recurring = data.recurring.filter(x => x.id !== id);
+  });
+  renderRecurringList();
+}
+
 function openModal(id) {
   document.getElementById(id).classList.remove('hidden');
 }
@@ -1234,6 +1340,7 @@ function init() {
     state.month--;
     if (state.month < 0) { state.month = 11; state.year--; }
     carryForwardBudgets();
+    generateRecurringEntriesForMonth(state.year, state.month);
     render();
   });
 
@@ -1241,6 +1348,7 @@ function init() {
     state.month++;
     if (state.month > 11) { state.month = 0; state.year++; }
     carryForwardBudgets();
+    generateRecurringEntriesForMonth(state.year, state.month);
     render();
   });
 
@@ -1270,6 +1378,11 @@ function init() {
   document.getElementById('btn-recent-moves').addEventListener('click', () => {
     renderRecentMoves();
     openModal('recent-moves-modal');
+  });
+
+  document.getElementById('btn-recurring').addEventListener('click', () => {
+    renderRecurringList();
+    openModal('recurring-modal');
   });
 
   document.getElementById('btn-clear-icon').addEventListener('click', () => {
@@ -1339,6 +1452,7 @@ function init() {
 
   updateUndoRedoButtons();
   carryForwardBudgets();
+  generateRecurringEntriesForMonth(state.year, state.month);
   render();
 }
 

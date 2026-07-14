@@ -291,6 +291,12 @@ body {
   margin: 0;
 }
 
+.panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .btn-primary {
   background: var(--accent);
   color: #fff;
@@ -603,6 +609,31 @@ body {
   font-family: inherit;
   background: var(--bg);
   color: var(--text);
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem !important;
+  color: var(--text) !important;
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.recurring-hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 10px 0 0;
 }
 
 #entry-form input:focus,
@@ -956,6 +987,65 @@ body {
   color: var(--text-muted);
   white-space: nowrap;
   font-size: 0.76rem;
+}
+
+.recurring-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.recurring-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.recurring-item.paused { opacity: 0.55; }
+
+.recurring-icon { font-size: 1.1rem; flex-shrink: 0; }
+
+.recurring-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.recurring-name { font-weight: 500; font-size: 0.92rem; }
+
+.recurring-meta {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.recurring-amount {
+  font-weight: 600;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.recurring-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.entry-recurring-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.72rem;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-left: 6px;
 }
 
 .accounts-view {

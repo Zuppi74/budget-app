@@ -99,7 +99,10 @@
     <section class="panel entries-panel">
       <div class="panel-header">
         <h2>Einträge</h2>
-        <button id="btn-add-entry" class="btn-primary">+ Eintrag</button>
+        <div class="panel-header-actions">
+          <button id="btn-recurring" class="btn-secondary">Wiederkehrend</button>
+          <button id="btn-add-entry" class="btn-primary">+ Eintrag</button>
+        </div>
       </div>
       <div id="entries-list" class="entries-list">
         <p class="empty-hint">Keine Einträge in diesem Monat.</p>
@@ -211,6 +214,12 @@
       <label for="entry-date">Datum</label>
       <input type="date" id="entry-date" required>
 
+      <label class="checkbox-label" id="entry-recurring-row" for="entry-recurring">
+        <input type="checkbox" id="entry-recurring">
+        Wiederkehrend (jeden Monat am gleichen Tag)
+      </label>
+      <p id="entry-recurring-hint" class="recurring-hint hidden">Diese Buchung gehört zu einer wiederkehrenden Reihe. Änderungen betreffen nur diesen Eintrag.</p>
+
       <label for="entry-label">Label</label>
       <input type="text" id="entry-label" list="label-options" placeholder="Optional, z. B. Urlaub">
       <datalist id="label-options"></datalist>
@@ -223,6 +232,16 @@
         <button type="submit" class="btn-primary">Speichern</button>
       </div>
     </form>
+  </div>
+</div>
+
+<div id="recurring-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Wiederkehrende Buchungen</h3>
+      <button class="icon-btn modal-close" data-close="recurring-modal" aria-label="Schließen">✕</button>
+    </div>
+    <div id="recurring-list" class="recurring-list"></div>
   </div>
 </div>
 
