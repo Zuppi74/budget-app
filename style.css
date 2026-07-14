@@ -400,6 +400,65 @@ body {
   color: var(--text-muted);
 }
 
+.saldo-bar-container {
+  margin-top: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.saldo-bar-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.saldo-bar-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.saldo-bar-value {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.saldo-bar-track {
+  position: relative;
+  height: 10px;
+  background: var(--border);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.saldo-bar-center {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 2px;
+  height: 100%;
+  background: var(--surface);
+  z-index: 1;
+}
+
+.saldo-bar-fill {
+  position: absolute;
+  top: 0;
+  height: 100%;
+}
+
+.saldo-bar-fill.positive {
+  left: 50%;
+  background: var(--income);
+  border-radius: 0 5px 5px 0;
+}
+
+.saldo-bar-fill.negative {
+  right: 50%;
+  background: var(--expense);
+  border-radius: 5px 0 0 5px;
+}
+
 .chart-legend {
   width: 100%;
   display: flex;

@@ -393,6 +393,7 @@ function renderBarChart(entries) {
 
   if (income === 0 && expense === 0) {
     container.innerHTML = '<p class="empty-hint">Keine Einträge in diesem Monat.</p>';
+    renderSaldoBar(income, expense);
     return;
   }
 
@@ -411,6 +412,27 @@ function renderBarChart(entries) {
       <span class="bar-value">${formatCurrency(expense)}</span>
       <div class="bar-shape expense" style="height:${expenseHeight}px"></div>
       <span class="bar-label">Ausgaben</span>
+    </div>`;
+
+  renderSaldoBar(income, expense);
+}
+
+function renderSaldoBar(income, expense) {
+  const container = document.getElementById('saldo-bar-container');
+  const saldo = income - expense;
+  const scale = Math.max(income, expense, 1);
+  const pct = Math.min((Math.abs(saldo) / scale) * 50, 50);
+  const fillClass = saldo >= 0 ? 'positive' : 'negative';
+  const valueColor = saldo < 0 ? 'var(--expense)' : 'var(--income)';
+
+  container.innerHTML = `
+    <div class="saldo-bar-label-row">
+      <span class="saldo-bar-label">Saldo</span>
+      <span class="saldo-bar-value" style="color:${valueColor}">${formatCurrency(saldo)}</span>
+    </div>
+    <div class="saldo-bar-track">
+      <div class="saldo-bar-fill ${fillClass}" style="width:${pct}%"></div>
+      <div class="saldo-bar-center"></div>
     </div>`;
 }
 
