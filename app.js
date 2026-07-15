@@ -669,6 +669,8 @@ function renderCategoryRowHtml(cat, entries) {
   const remaining = available - spent;
   const overspent = remaining < 0;
   const pct = available > 0 ? Math.min(spent / available, 1) * 100 : (spent > 0 ? 100 : 0);
+  const remainingPct = available > 0 ? Math.max(remaining / available, 0) * 100 : 0;
+  const remainingPctDisplay = available === 0 ? '–' : `${Math.round(remainingPct)} %`;
 
   const rolloverNote = rollover > 0
     ? `<div class="budget-cat-rollover">+ ${formatCurrency(rollover)} aus Vormonat übertragen</div>`
@@ -700,8 +702,11 @@ function renderCategoryRowHtml(cat, entries) {
         <span class="budget-cat-amount" data-edit-budget="${cat.id}" title="Monatliches Budget bearbeiten">${formatCurrency(budget)}</span>
         <button type="button" class="icon-btn small" data-delete-cat="${cat.id}" aria-label="Kategorie löschen">✕</button>
       </div>
-      <div class="budget-bar-track">
-        <div class="budget-bar-fill ${overspent ? 'overspent' : ''}" style="width:${pct}%"></div>
+      <div class="budget-bar-row">
+        <div class="budget-bar-track">
+          <div class="budget-bar-fill ${overspent ? 'overspent' : ''}" style="width:${pct}%"></div>
+        </div>
+        <span class="budget-bar-percent ${overspent ? 'overspent' : ''}" title="Noch verfügbar in %">${remainingPctDisplay}</span>
       </div>
       ${rolloverNote}
       ${remainingLine}

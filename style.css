@@ -954,8 +954,14 @@ body {
 
 .budget-cat-amount:hover { background: var(--bg); }
 
+.budget-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .budget-bar-track {
-  width: 100%;
+  flex: 1;
   height: 6px;
   background: var(--border);
   border-radius: 3px;
@@ -969,6 +975,18 @@ body {
 }
 
 .budget-bar-fill.overspent { background: var(--expense); }
+
+.budget-bar-percent {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  min-width: 32px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.budget-bar-percent.overspent { color: var(--expense); }
 
 .budget-cat-status {
   font-size: 0.78rem;
