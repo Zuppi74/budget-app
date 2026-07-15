@@ -248,6 +248,27 @@
   </div>
 </div>
 
+<div id="transfer-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Geld umlagern</h3>
+      <button class="icon-btn modal-close" data-close="transfer-modal" aria-label="Schließen">✕</button>
+    </div>
+    <p id="transfer-target-info" class="recurring-hint"></p>
+    <form id="transfer-form">
+      <label for="transfer-source">Von Kategorie</label>
+      <select id="transfer-source" required></select>
+
+      <label for="transfer-amount">Betrag (CHF)</label>
+      <input type="number" id="transfer-amount" step="0.01" min="0.01" required>
+
+      <div class="modal-actions">
+        <button type="submit" class="btn-primary">Umlagern</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <div id="icon-picker-modal" class="modal-overlay hidden">
   <div class="modal">
     <div class="modal-header">

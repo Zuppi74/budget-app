@@ -636,20 +636,24 @@ body {
   font-size: 1.1rem;
 }
 
-#entry-form {
+#entry-form,
+#transfer-form {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-#entry-form label {
+#entry-form label,
+#transfer-form label {
   font-size: 0.82rem;
   color: var(--text-muted);
   margin-top: 10px;
 }
 
 #entry-form input,
-#entry-form select {
+#entry-form select,
+#transfer-form input,
+#transfer-form select {
   padding: 9px 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -685,7 +689,9 @@ body {
 }
 
 #entry-form input:focus,
-#entry-form select:focus {
+#entry-form select:focus,
+#transfer-form input:focus,
+#transfer-form select:focus {
   outline: none;
   border-color: var(--accent);
 }
@@ -957,6 +963,19 @@ body {
   font-weight: 700;
   margin-top: 4px;
 }
+
+.budget-cat-transfer-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 0 0;
+  text-decoration: underline;
+}
+
+.budget-cat-transfer-btn:hover { color: var(--accent-hover); }
 
 .inline-edit-input {
   padding: 3px 6px;

@@ -611,6 +611,9 @@ function renderBudgetView() {
   container.querySelectorAll('[data-edit-icon]').forEach(el => {
     el.addEventListener('click', () => openIconPicker(el.dataset.editIcon));
   });
+  container.querySelectorAll('[data-transfer-target]').forEach(btn => {
+    btn.addEventListener('click', () => openTransferModal(btn.dataset.transferTarget));
+  });
 }
 
 function renderGroupHtml(group, entries) {
@@ -656,6 +659,10 @@ function renderCategoryRowHtml(cat, entries) {
     ? `<div class="budget-cat-status">${formatCurrency(spent)} von ${formatCurrency(available)} ausgegeben</div>`
     : '';
 
+  const transferButton = overspent
+    ? `<button type="button" class="budget-cat-transfer-btn" data-transfer-target="${cat.id}">Geld umlagern</button>`
+    : '';
+
   const iconDisplay = cat.icon || '+';
   const iconClass = cat.icon ? 'budget-cat-icon' : 'budget-cat-icon empty';
 
@@ -673,12 +680,67 @@ function renderCategoryRowHtml(cat, entries) {
       ${rolloverNote}
       ${remainingLine}
       ${spentLine}
+      ${transferButton}
     </div>`;
 }
 
 function rerenderActiveView() {
   if (state.view === 'budget') renderBudgetView();
   else if (state.view === 'accounts') renderAccountsView();
+}
+
+function getAllCategoriesFlat() {
+  return data.categoryGroups.flatMap(group => group.categories);
+}
+
+function openTransferModal(targetCategoryId) {
+  const found = findCategory(targetCategoryId);
+  if (!found) return;
+  const targetCat = found.category;
+
+  const entries = getEntriesForCurrentMonth().filter(e => e.type === 'expense');
+  const targetSpent = entries.filter(e => e.category === targetCategoryId).reduce((s, e) => s + e.amount, 0);
+  const targetAvailable = getBudget(targetCategoryId, state.year, state.month) + getRolloverForMonth(targetCategoryId, state.year, state.month);
+  const shortfall = Math.max(targetSpent - targetAvailable, 0);
+
+  document.getElementById('transfer-target-info').textContent =
+    `Fehlbetrag in ${getCategoryDisplayName(targetCategoryId)}: ${formatCurrency(shortfall)}`;
+
+  const sourceSelect = document.getElementById('transfer-source');
+  const otherCats = getAllCategoriesFlat().filter(c => c.id !== targetCategoryId);
+  sourceSelect.innerHTML = otherCats.map(c => {
+    const catAvailable = getBudget(c.id, state.year, state.month) + getRolloverForMonth(c.id, state.year, state.month);
+    const catSpent = entries.filter(e => e.category === c.id).reduce((s, e) => s + e.amount, 0);
+    const catRemaining = catAvailable - catSpent;
+    const icon = c.icon ? c.icon + ' ' : '';
+    return `<option value="${c.id}">${icon}${escapeHtml(c.name)} (verfügbar: ${formatCurrency(catRemaining)})</option>`;
+  }).join('');
+
+  document.getElementById('transfer-amount').value = shortfall > 0 ? shortfall.toFixed(2) : '';
+  document.getElementById('transfer-form').dataset.target = targetCategoryId;
+
+  openModal('transfer-modal');
+}
+
+function handleTransferSubmit(e) {
+  e.preventDefault();
+  const targetCategoryId = document.getElementById('transfer-form').dataset.target;
+  const sourceCategoryId = document.getElementById('transfer-source').value;
+  const amount = parseFloat(document.getElementById('transfer-amount').value);
+
+  if (!amount || amount <= 0 || !sourceCategoryId || sourceCategoryId === targetCategoryId) return;
+
+  const sourceName = getCategoryName(sourceCategoryId);
+  const targetName = getCategoryName(targetCategoryId);
+
+  mutate(`${formatCurrency(amount)} von "${sourceName}" zu "${targetName}" umgelagert`, () => {
+    const sourceBudget = getBudget(sourceCategoryId, state.year, state.month);
+    const targetBudget = getBudget(targetCategoryId, state.year, state.month);
+    setBudget(sourceCategoryId, state.year, state.month, sourceBudget - amount);
+    setBudget(targetCategoryId, state.year, state.month, targetBudget + amount);
+  });
+
+  closeModal('transfer-modal');
 }
 
 function startInlineEdit(el, onCommit, datalistId) {
@@ -1483,6 +1545,7 @@ function init() {
 
   document.getElementById('entry-form').addEventListener('submit', handleEntryFormSubmit);
   document.getElementById('btn-delete-entry').addEventListener('click', deleteCurrentEntry);
+  document.getElementById('transfer-form').addEventListener('submit', handleTransferSubmit);
 
   document.querySelector('[data-add-income-category]').addEventListener('click', () => {
     const input = document.getElementById('new-category-income');
