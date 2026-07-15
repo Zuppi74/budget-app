@@ -263,6 +263,12 @@ function getSpentForCategoryInMonth(categoryId, year, month) {
     .reduce((s, e) => s + e.amount, 0);
 }
 
+function getCategoryRemainingForMonth(categoryId, year, month) {
+  const available = getBudget(categoryId, year, month) + getRolloverForMonth(categoryId, year, month);
+  const spent = getSpentForCategoryInMonth(categoryId, year, month);
+  return available - spent;
+}
+
 function getRolloverForMonth(categoryId, year, month, depth) {
   depth = depth || 0;
   if (depth > 60) return 0;
@@ -696,12 +702,8 @@ function getAllCategoriesFlat() {
 function openTransferModal(targetCategoryId) {
   const found = findCategory(targetCategoryId);
   if (!found) return;
-  const targetCat = found.category;
 
-  const entries = getEntriesForCurrentMonth().filter(e => e.type === 'expense');
-  const targetSpent = entries.filter(e => e.category === targetCategoryId).reduce((s, e) => s + e.amount, 0);
-  const targetAvailable = getBudget(targetCategoryId, state.year, state.month) + getRolloverForMonth(targetCategoryId, state.year, state.month);
-  const shortfall = Math.max(targetSpent - targetAvailable, 0);
+  const shortfall = Math.max(-getCategoryRemainingForMonth(targetCategoryId, state.year, state.month), 0);
 
   document.getElementById('transfer-target-info').textContent =
     `Fehlbetrag in ${getCategoryDisplayName(targetCategoryId)}: ${formatCurrency(shortfall)}`;
@@ -709,17 +711,33 @@ function openTransferModal(targetCategoryId) {
   const sourceSelect = document.getElementById('transfer-source');
   const otherCats = getAllCategoriesFlat().filter(c => c.id !== targetCategoryId);
   sourceSelect.innerHTML = otherCats.map(c => {
-    const catAvailable = getBudget(c.id, state.year, state.month) + getRolloverForMonth(c.id, state.year, state.month);
-    const catSpent = entries.filter(e => e.category === c.id).reduce((s, e) => s + e.amount, 0);
-    const catRemaining = catAvailable - catSpent;
+    const catRemaining = getCategoryRemainingForMonth(c.id, state.year, state.month);
     const icon = c.icon ? c.icon + ' ' : '';
     return `<option value="${c.id}">${icon}${escapeHtml(c.name)} (verfügbar: ${formatCurrency(catRemaining)})</option>`;
   }).join('');
 
-  document.getElementById('transfer-amount').value = shortfall > 0 ? shortfall.toFixed(2) : '';
   document.getElementById('transfer-form').dataset.target = targetCategoryId;
+  document.getElementById('transfer-error').textContent = '';
+  updateTransferAmountLimit(shortfall);
 
   openModal('transfer-modal');
+}
+
+function updateTransferAmountLimit(preferredAmount) {
+  const sourceCategoryId = document.getElementById('transfer-source').value;
+  if (!sourceCategoryId) return;
+  const sourceRemaining = Math.max(getCategoryRemainingForMonth(sourceCategoryId, state.year, state.month), 0);
+
+  const amountInput = document.getElementById('transfer-amount');
+  amountInput.max = sourceRemaining.toFixed(2);
+
+  const desired = preferredAmount !== undefined ? preferredAmount : parseFloat(amountInput.value) || 0;
+  const clamped = Math.min(desired, sourceRemaining);
+  amountInput.value = clamped > 0 ? clamped.toFixed(2) : '';
+
+  document.getElementById('transfer-error').textContent = sourceRemaining <= 0
+    ? 'Diese Kategorie hat aktuell nichts zum Umlagern verfügbar.'
+    : '';
 }
 
 function handleTransferSubmit(e) {
@@ -727,8 +745,15 @@ function handleTransferSubmit(e) {
   const targetCategoryId = document.getElementById('transfer-form').dataset.target;
   const sourceCategoryId = document.getElementById('transfer-source').value;
   const amount = parseFloat(document.getElementById('transfer-amount').value);
+  const errorEl = document.getElementById('transfer-error');
 
   if (!amount || amount <= 0 || !sourceCategoryId || sourceCategoryId === targetCategoryId) return;
+
+  const sourceRemaining = getCategoryRemainingForMonth(sourceCategoryId, state.year, state.month);
+  if (amount > sourceRemaining + 0.001) {
+    errorEl.textContent = `Nur ${formatCurrency(Math.max(sourceRemaining, 0))} von "${getCategoryName(sourceCategoryId)}" verfügbar.`;
+    return;
+  }
 
   const sourceName = getCategoryName(sourceCategoryId);
   const targetName = getCategoryName(targetCategoryId);
@@ -1546,6 +1571,7 @@ function init() {
   document.getElementById('entry-form').addEventListener('submit', handleEntryFormSubmit);
   document.getElementById('btn-delete-entry').addEventListener('click', deleteCurrentEntry);
   document.getElementById('transfer-form').addEventListener('submit', handleTransferSubmit);
+  document.getElementById('transfer-source').addEventListener('change', () => updateTransferAmountLimit());
 
   document.querySelector('[data-add-income-category]').addEventListener('click', () => {
     const input = document.getElementById('new-category-income');

@@ -688,6 +688,13 @@ body {
   margin: 10px 0 0;
 }
 
+.transfer-error {
+  font-size: 0.8rem;
+  color: var(--expense);
+  margin: 6px 0 0;
+  min-height: 1em;
+}
+
 #entry-form input:focus,
 #entry-form select:focus,
 #transfer-form input:focus,
