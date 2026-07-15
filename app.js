@@ -486,15 +486,35 @@ function buildDonutChartHtml(items) {
 
   const legend = items.map((item, i) => {
     const color = CHART_COLORS[i % CHART_COLORS.length];
+    const share = total > 0 ? (item.value / total) * 100 : 0;
     return `
       <div class="legend-item">
         <span class="legend-swatch" style="background:${color}"></span>
         <span class="legend-label">${escapeHtml(item.name)}</span>
+        <span class="legend-share">${share.toFixed(1).replace('.', ',')} %</span>
         <span class="legend-value">${formatCurrency(item.value)}</span>
       </div>`;
   }).join('');
 
   return `${svg}<div class="chart-legend">${legend}</div>`;
+}
+
+function buildColumnChartHtml(items) {
+  const maxValue = Math.max(...items.map(i => i.value), 1);
+  const maxHeight = 120;
+
+  const bars = items.map((item, i) => {
+    const color = CHART_COLORS[i % CHART_COLORS.length];
+    const height = Math.max((item.value / maxValue) * maxHeight, 3);
+    return `
+      <div class="column-item">
+        <span class="bar-value">${formatCurrency(item.value)}</span>
+        <div class="column-shape" style="height:${height}px;background:${color}"></div>
+        <span class="column-label">${escapeHtml(item.name)}</span>
+      </div>`;
+  }).join('');
+
+  return `<div class="column-chart">${bars}</div>`;
 }
 
 function renderChart(entries) {
@@ -515,7 +535,7 @@ function renderChart(entries) {
     .map(([categoryId, value]) => ({ categoryId, name: getCategoryDisplayName(categoryId), value }))
     .sort((a, b) => b.value - a.value);
 
-  container.innerHTML = buildDonutChartHtml(items);
+  container.innerHTML = buildColumnChartHtml(items);
 }
 
 function renderLabelChart(entries) {
@@ -974,18 +994,36 @@ function renderReportView() {
       <td style="color:${totalBalance < 0 ? 'var(--expense)' : 'var(--income)'}">${formatCurrency(totalBalance)}</td>
     </tr>`;
 
-  renderReportCategoryTable(totalExpense);
+  renderReportCategoryTable();
 }
 
-function renderReportCategoryTable(totalExpense) {
-  const yearExpenses = data.entries.filter(e => {
+function populateReportCategoryMonthSelect() {
+  const select = document.getElementById('report-category-month-select');
+  if (select.dataset.populated) return;
+  const options = ['<option value="all">Ganzes Jahr</option>'];
+  for (let m = 0; m < 12; m++) {
+    const label = monthOnlyFmt.format(new Date(2000, m, 1));
+    options.push(`<option value="${m}">${label.charAt(0).toUpperCase() + label.slice(1)}</option>`);
+  }
+  select.innerHTML = options.join('');
+  select.dataset.populated = 'true';
+}
+
+function renderReportCategoryTable() {
+  populateReportCategoryMonthSelect();
+  const select = document.getElementById('report-category-month-select');
+  const monthFilter = select.value;
+
+  const filteredExpenses = data.entries.filter(e => {
     if (e.type !== 'expense') return false;
     const d = new Date(e.date + 'T00:00:00');
-    return d.getFullYear() === state.reportYear;
+    if (d.getFullYear() !== state.reportYear) return false;
+    if (monthFilter !== 'all' && d.getMonth() !== parseInt(monthFilter, 10)) return false;
+    return true;
   });
 
   const totals = {};
-  yearExpenses.forEach(e => {
+  filteredExpenses.forEach(e => {
     totals[e.category] = (totals[e.category] || 0) + e.amount;
   });
 
@@ -993,11 +1031,17 @@ function renderReportCategoryTable(totalExpense) {
     .map(([categoryId, value]) => ({ name: getCategoryDisplayName(categoryId), value }))
     .sort((a, b) => b.value - a.value);
 
+  const totalExpense = items.reduce((s, i) => s + i.value, 0);
+
   const body = document.getElementById('report-category-body');
   const foot = document.getElementById('report-category-foot');
 
+  const periodLabel = monthFilter === 'all'
+    ? String(state.reportYear)
+    : `${monthOnlyFmt.format(new Date(state.reportYear, parseInt(monthFilter, 10), 1)).replace(/^./, c => c.toUpperCase())} ${state.reportYear}`;
+
   if (items.length === 0) {
-    body.innerHTML = '<tr class="report-empty-month"><td colspan="3">Keine Ausgaben in diesem Jahr.</td></tr>';
+    body.innerHTML = '<tr class="report-empty-month"><td colspan="3">Keine Ausgaben in diesem Zeitraum.</td></tr>';
     foot.innerHTML = '';
     return;
   }
@@ -1014,7 +1058,7 @@ function renderReportCategoryTable(totalExpense) {
 
   foot.innerHTML = `
     <tr>
-      <td>Total ${state.reportYear}</td>
+      <td>Total ${periodLabel}</td>
       <td class="col-expense">${formatCurrency(totalExpense)}</td>
       <td>100,0 %</td>
     </tr>`;
@@ -1360,6 +1404,10 @@ function init() {
   document.getElementById('btn-next-year').addEventListener('click', () => {
     state.reportYear++;
     renderReportView();
+  });
+
+  document.getElementById('report-category-month-select').addEventListener('change', () => {
+    renderReportCategoryTable();
   });
 
   document.querySelectorAll('.tab-btn').forEach(btn => {
