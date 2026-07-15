@@ -571,11 +571,31 @@ function getTotalBudgetForCurrentMonth() {
   }, 0);
 }
 
+function getIncomeForMonth(year, month) {
+  return data.entries
+    .filter(e => e.type === 'income')
+    .filter(e => {
+      const d = new Date(e.date + 'T00:00:00');
+      return d.getFullYear() === year && d.getMonth() === month;
+    })
+    .reduce((s, e) => s + e.amount, 0);
+}
+
 function renderBudgetView() {
   const container = document.getElementById('budget-groups');
   const entries = getEntriesForCurrentMonth().filter(e => e.type === 'expense');
 
-  document.getElementById('budget-total').textContent = formatCurrency(getTotalBudgetForCurrentMonth());
+  const totalBudgeted = getTotalBudgetForCurrentMonth();
+  document.getElementById('budget-total').textContent = formatCurrency(totalBudgeted);
+
+  const prevDate = new Date(state.year, state.month - 1, 1);
+  const prevIncome = getIncomeForMonth(prevDate.getFullYear(), prevDate.getMonth());
+  const remainingToAssign = prevIncome - totalBudgeted;
+  const remainingEl = document.getElementById('budget-remaining-to-assign');
+  remainingEl.textContent = formatCurrency(remainingToAssign);
+  remainingEl.classList.toggle('negative', remainingToAssign < 0);
+  document.getElementById('budget-remaining-to-assign-hint').textContent =
+    `Basis: Einnahmen ${monthOnlyFmt.format(prevDate).replace(/^./, c => c.toUpperCase())} (${formatCurrency(prevIncome)})`;
 
   container.innerHTML = data.categoryGroups.map(group => renderGroupHtml(group, entries)).join('');
 

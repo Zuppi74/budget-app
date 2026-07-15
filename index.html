@@ -111,9 +111,16 @@
   </section>
 
   <section id="budget-view" class="budget-view hidden">
-    <div class="budget-summary">
-      <span class="summary-label">Budgetiert diesen Monat</span>
-      <span id="budget-total" class="summary-value">CHF 0.00</span>
+    <div class="budget-summary-row">
+      <div class="budget-summary">
+        <span class="summary-label">Budgetiert diesen Monat</span>
+        <span id="budget-total" class="summary-value">CHF 0.00</span>
+      </div>
+      <div class="budget-summary">
+        <span class="summary-label">Noch zu budgetieren</span>
+        <span id="budget-remaining-to-assign" class="summary-value">CHF 0.00</span>
+        <span id="budget-remaining-to-assign-hint" class="budget-summary-hint"></span>
+      </div>
     </div>
     <div id="budget-groups"></div>
     <div class="budget-add-group">

@@ -803,6 +803,16 @@ body {
   gap: 16px;
 }
 
+.budget-summary-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 600px) {
+  .budget-summary-row { grid-template-columns: 1fr; }
+}
+
 .budget-summary {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -815,6 +825,13 @@ body {
 }
 
 .budget-summary .summary-value { color: var(--accent); }
+
+.budget-summary .summary-value.negative { color: var(--expense); }
+
+.budget-summary-hint {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
 
 .budget-group {
   background: var(--surface);
