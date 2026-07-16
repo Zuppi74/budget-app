@@ -637,14 +637,18 @@ body {
 }
 
 #entry-form,
-#transfer-form {
+#transfer-form,
+#purchase-form,
+#current-value-form {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
 #entry-form label,
-#transfer-form label {
+#transfer-form label,
+#purchase-form label,
+#current-value-form label {
   font-size: 0.82rem;
   color: var(--text-muted);
   margin-top: 10px;
@@ -653,7 +657,9 @@ body {
 #entry-form input,
 #entry-form select,
 #transfer-form input,
-#transfer-form select {
+#transfer-form select,
+#purchase-form input,
+#current-value-form input {
   padding: 9px 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -1406,3 +1412,165 @@ body {
   font-weight: 700;
   font-size: 0.92rem;
 }
+
+.depot-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.depot-summary-row { margin-bottom: 0; }
+
+.summary-value.positive { color: var(--income); }
+.summary-value.negative { color: var(--expense); }
+
+.depots-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.depot-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.depot-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--bg);
+}
+
+.depot-name {
+  flex: 1;
+  font-weight: 600;
+  cursor: text;
+  padding: 3px 6px;
+  border-radius: 4px;
+}
+
+.depot-name:hover { background: var(--border); }
+
+.depot-holdings {
+  padding: 8px 16px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.depot-add-holding {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 16px 16px;
+}
+
+.depot-add-holding input,
+.depot-add-holding select {
+  flex: 1;
+  min-width: 120px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-family: inherit;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.holding-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.holding-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.holding-type-badge {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+
+.holding-name {
+  flex: 1;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: text;
+  padding: 2px 6px;
+  border-radius: 4px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.holding-name:hover { background: var(--bg); }
+
+.holding-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.holding-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.holding-stat.editable { cursor: pointer; }
+.holding-stat.editable:hover .holding-stat-value { text-decoration: underline; }
+
+.holding-stat-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.holding-stat-value {
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.holding-stat-value.positive { color: var(--income); }
+.holding-stat-value.negative { color: var(--expense); }
+
+.holding-purchases {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.purchase-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+
+.purchase-row:hover { background: var(--bg); }
+
+.purchase-row-main { color: var(--text-muted); }
+.purchase-row-amount { font-weight: 600; white-space: nowrap; }

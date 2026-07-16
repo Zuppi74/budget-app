@@ -34,6 +34,7 @@
     <button class="tab-btn" data-view="capture">Erfassung</button>
     <button class="tab-btn" data-view="budget">Budget</button>
     <button class="tab-btn" data-view="accounts">Konten</button>
+    <button class="tab-btn" data-view="depot">Depot</button>
     <button class="tab-btn" data-view="report">Auswertung</button>
   </div>
 
@@ -145,6 +146,38 @@
       </div>
     </div>
   </section>
+
+  <section id="depot-view" class="depot-view hidden">
+    <div class="summary depot-summary-row">
+      <div class="summary-card">
+        <span class="summary-label">Investiert</span>
+        <span id="depot-invested-total" class="summary-value">CHF 0.00</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-label">Aktueller Wert</span>
+        <span id="depot-value-total" class="summary-value">CHF 0.00</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-label">Gewinn/Verlust</span>
+        <span id="depot-gain-total" class="summary-value">CHF 0.00</span>
+      </div>
+    </div>
+    <div id="depots-list" class="depots-list"></div>
+    <div class="account-add panel">
+      <h2>Depot hinzufügen</h2>
+      <div class="account-add-fields">
+        <input type="text" id="new-depot-name" placeholder="Name (z. B. Interactive Brokers)">
+        <button type="button" id="btn-add-depot" class="btn-primary">+ Depot</button>
+      </div>
+    </div>
+  </section>
+
+  <datalist id="currency-options">
+    <option value="CHF">
+    <option value="USD">
+    <option value="EUR">
+    <option value="GBP">
+  </datalist>
 
   <section id="report-view" class="report-view hidden">
     <nav class="year-nav">
@@ -272,6 +305,52 @@
 
       <div class="modal-actions">
         <button type="submit" class="btn-primary">Umlagern</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="purchase-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="purchase-modal-title">Kauf hinzufügen</h3>
+      <button class="icon-btn modal-close" data-close="purchase-modal" aria-label="Schließen">✕</button>
+    </div>
+    <form id="purchase-form">
+      <label for="purchase-date">Kaufdatum</label>
+      <input type="date" id="purchase-date" required>
+
+      <label for="purchase-quantity">Anzahl</label>
+      <input type="number" id="purchase-quantity" step="any" min="0" required>
+
+      <label for="purchase-amount">Betrag</label>
+      <input type="number" id="purchase-amount" step="0.01" min="0" required>
+
+      <label for="purchase-currency">Währung</label>
+      <input type="text" id="purchase-currency" list="currency-options" value="CHF" required>
+
+      <label for="purchase-exchange-rate">Wechselkurs (1 Einheit Währung = X CHF)</label>
+      <input type="number" id="purchase-exchange-rate" step="0.0001" min="0" value="1" required>
+
+      <div class="modal-actions">
+        <button type="button" id="btn-delete-purchase" class="btn-danger hidden">Löschen</button>
+        <button type="submit" class="btn-primary">Speichern</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="current-value-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Aktuellen Wert bearbeiten</h3>
+      <button class="icon-btn modal-close" data-close="current-value-modal" aria-label="Schließen">✕</button>
+    </div>
+    <form id="current-value-form">
+      <label for="current-value-input">Aktueller Gesamtwert der Position (CHF)</label>
+      <input type="number" id="current-value-input" step="0.01" min="0" required>
+      <div class="modal-actions">
+        <button type="submit" class="btn-primary">Speichern</button>
       </div>
     </form>
   </div>

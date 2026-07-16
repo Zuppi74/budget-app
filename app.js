@@ -42,6 +42,7 @@ const DEFAULT_DATA = {
   ],
   entries: [],
   recurring: [],
+  depots: [],
   recentMoves: []
 };
 
@@ -63,6 +64,12 @@ const currencyFmt = new Intl.NumberFormat('de-CH', { style: 'currency', currency
 function formatCurrency(amount) {
   const formatted = currencyFmt.format(Math.abs(amount));
   return amount < 0 ? `-${formatted}` : formatted;
+}
+
+const quantityFmt = new Intl.NumberFormat('de-CH', { maximumFractionDigits: 6 });
+
+function formatQuantity(qty) {
+  return quantityFmt.format(qty);
 }
 const monthFmt = new Intl.DateTimeFormat('de-DE', { month: 'long', year: 'numeric' });
 const monthOnlyFmt = new Intl.DateTimeFormat('de-DE', { month: 'long' });
@@ -105,7 +112,7 @@ function migrateOldData(old) {
     }
     return e;
   });
-  return ensureAccounts({ categoryGroups, incomeCategories, budgets: {}, entries, recurring: [], recentMoves: [] });
+  return ensureAccounts({ categoryGroups, incomeCategories, budgets: {}, entries, recurring: [], depots: [], recentMoves: [] });
 }
 
 function loadData() {
@@ -117,6 +124,7 @@ function loadData() {
         parsed.budgets = parsed.budgets || {};
         parsed.recentMoves = parsed.recentMoves || [];
         parsed.recurring = parsed.recurring || [];
+        parsed.depots = parsed.depots || [];
         return ensureAccounts(parsed);
       }
     }
@@ -718,6 +726,7 @@ function renderCategoryRowHtml(cat, entries) {
 function rerenderActiveView() {
   if (state.view === 'budget') renderBudgetView();
   else if (state.view === 'accounts') renderAccountsView();
+  else if (state.view === 'depot') renderDepotView();
 }
 
 function getAllCategoriesFlat() {
@@ -1067,6 +1076,340 @@ function addNewAccount() {
   balanceInput.value = '';
 }
 
+function findDepot(depotId) {
+  return data.depots.find(d => d.id === depotId) || null;
+}
+
+function findHolding(holdingId) {
+  for (const depot of data.depots) {
+    const holding = depot.holdings.find(h => h.id === holdingId);
+    if (holding) return { depot, holding };
+  }
+  return null;
+}
+
+function getHoldingTotalQuantity(holding) {
+  return holding.purchases.reduce((s, p) => s + p.quantity, 0);
+}
+
+function getHoldingCostBasisCHF(holding) {
+  return holding.purchases.reduce((s, p) => s + p.amount * (p.exchangeRate || 1), 0);
+}
+
+function renderDepotView() {
+  let totalInvested = 0;
+  let totalValue = 0;
+  data.depots.forEach(depot => {
+    depot.holdings.forEach(h => {
+      totalInvested += getHoldingCostBasisCHF(h);
+      totalValue += (h.currentValue || 0);
+    });
+  });
+  const totalGain = totalValue - totalInvested;
+  const totalGainPct = totalInvested > 0 ? (totalGain / totalInvested) * 100 : 0;
+
+  document.getElementById('depot-invested-total').textContent = formatCurrency(totalInvested);
+  document.getElementById('depot-value-total').textContent = formatCurrency(totalValue);
+  const gainEl = document.getElementById('depot-gain-total');
+  const sign = totalGain >= 0 ? '+' : '';
+  gainEl.textContent = `${formatCurrency(totalGain)} (${sign}${totalGainPct.toFixed(1).replace('.', ',')} %)`;
+  gainEl.className = `summary-value ${totalGain < 0 ? 'negative' : 'positive'}`;
+
+  const container = document.getElementById('depots-list');
+  if (data.depots.length === 0) {
+    container.innerHTML = '<p class="empty-hint">Noch keine Depots angelegt.</p>';
+  } else {
+    container.innerHTML = data.depots.map(renderDepotHtml).join('');
+  }
+
+  container.querySelectorAll('[data-rename-depot]').forEach(el => {
+    el.addEventListener('click', () => startInlineEdit(el, (newName) => renameDepot(el.dataset.renameDepot, newName)));
+  });
+  container.querySelectorAll('[data-delete-depot]').forEach(btn => {
+    btn.addEventListener('click', () => deleteDepot(btn.dataset.deleteDepot));
+  });
+  container.querySelectorAll('[data-add-holding-to]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const depotId = btn.dataset.addHoldingTo;
+      const nameInput = container.querySelector(`.new-holding-name[data-depot-id="${depotId}"]`);
+      const typeSelect = container.querySelector(`.new-holding-type[data-depot-id="${depotId}"]`);
+      addHoldingToDepot(depotId, nameInput.value, typeSelect.value);
+      nameInput.value = '';
+    });
+  });
+  container.querySelectorAll('.new-holding-name').forEach(input => {
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const depotId = input.dataset.depotId;
+        const typeSelect = container.querySelector(`.new-holding-type[data-depot-id="${depotId}"]`);
+        addHoldingToDepot(depotId, input.value, typeSelect.value);
+        input.value = '';
+      }
+    });
+  });
+  container.querySelectorAll('[data-rename-holding]').forEach(el => {
+    el.addEventListener('click', () => startInlineEdit(el, (newName) => renameHolding(el.dataset.renameHolding, newName)));
+  });
+  container.querySelectorAll('[data-delete-holding]').forEach(btn => {
+    btn.addEventListener('click', () => deleteHolding(btn.dataset.deleteHolding));
+  });
+  container.querySelectorAll('[data-toggle-holding]').forEach(btn => {
+    btn.addEventListener('click', () => toggleHoldingExpanded(btn.dataset.toggleHolding));
+  });
+  container.querySelectorAll('[data-edit-current-value]').forEach(el => {
+    el.addEventListener('click', () => openCurrentValueModal(el.dataset.editCurrentValue));
+  });
+  container.querySelectorAll('[data-add-purchase]').forEach(btn => {
+    btn.addEventListener('click', () => openPurchaseModal(btn.dataset.addPurchase, null));
+  });
+  container.querySelectorAll('[data-edit-purchase]').forEach(row => {
+    row.addEventListener('click', () => openPurchaseModal(row.dataset.holdingId, row.dataset.editPurchase));
+  });
+}
+
+function renderDepotHtml(depot) {
+  const holdingsHtml = depot.holdings.map(h => renderHoldingHtml(depot, h)).join('');
+  return `
+    <div class="depot-card" data-depot-id="${depot.id}">
+      <div class="depot-header">
+        <span class="depot-name" data-rename-depot="${depot.id}">${escapeHtml(depot.name)}</span>
+        <button type="button" class="icon-btn small" data-delete-depot="${depot.id}" aria-label="Depot löschen">✕</button>
+      </div>
+      <div class="depot-holdings">
+        ${holdingsHtml || '<p class="empty-hint">Keine Positionen in diesem Depot.</p>'}
+      </div>
+      <div class="depot-add-holding">
+        <input type="text" class="new-holding-name" data-depot-id="${depot.id}" placeholder="Name (z. B. Apple, Bitcoin)">
+        <select class="new-holding-type" data-depot-id="${depot.id}">
+          <option value="Aktie">Aktie</option>
+          <option value="Krypto">Krypto</option>
+          <option value="Fonds">Fonds</option>
+          <option value="Sonstiges">Sonstiges</option>
+        </select>
+        <button type="button" class="btn-secondary" data-add-holding-to="${depot.id}">+ Position</button>
+      </div>
+    </div>`;
+}
+
+function renderHoldingHtml(depot, holding) {
+  const qty = getHoldingTotalQuantity(holding);
+  const invested = getHoldingCostBasisCHF(holding);
+  const value = holding.currentValue || 0;
+  const gain = value - invested;
+  const gainPct = invested > 0 ? (gain / invested) * 100 : 0;
+  const gainSign = gain >= 0 ? '+' : '';
+
+  const purchasesHtml = holding.purchases.length
+    ? holding.purchases.slice().sort((a, b) => b.date.localeCompare(a.date)).map(p => renderPurchaseRowHtml(holding, p)).join('')
+    : '<p class="empty-hint">Noch keine Käufe erfasst.</p>';
+
+  return `
+    <div class="holding-card" data-holding-id="${holding.id}">
+      <div class="holding-top">
+        <span class="holding-type-badge">${escapeHtml(holding.type)}</span>
+        <span class="holding-name" data-rename-holding="${holding.id}">${escapeHtml(holding.name)}</span>
+        <button type="button" class="icon-btn small" data-toggle-holding="${holding.id}" aria-label="Käufe anzeigen">${holding.expanded ? '⌄' : '›'}</button>
+        <button type="button" class="icon-btn small" data-delete-holding="${holding.id}" aria-label="Position löschen">✕</button>
+      </div>
+      <div class="holding-stats">
+        <div class="holding-stat">
+          <span class="holding-stat-label">Anzahl</span>
+          <span class="holding-stat-value">${formatQuantity(qty)}</span>
+        </div>
+        <div class="holding-stat">
+          <span class="holding-stat-label">Investiert</span>
+          <span class="holding-stat-value">${formatCurrency(invested)}</span>
+        </div>
+        <div class="holding-stat editable" data-edit-current-value="${holding.id}" title="Aktuellen Wert bearbeiten">
+          <span class="holding-stat-label">Akt. Wert</span>
+          <span class="holding-stat-value">${holding.currentValue != null ? formatCurrency(value) : 'setzen'}</span>
+        </div>
+        <div class="holding-stat">
+          <span class="holding-stat-label">Gewinn/Verlust</span>
+          <span class="holding-stat-value ${gain < 0 ? 'negative' : 'positive'}">${formatCurrency(gain)} (${gainSign}${gainPct.toFixed(1).replace('.', ',')} %)</span>
+        </div>
+      </div>
+      <div class="holding-purchases ${holding.expanded ? '' : 'hidden'}">
+        ${purchasesHtml}
+        <button type="button" class="btn-secondary" data-add-purchase="${holding.id}">+ Kauf</button>
+      </div>
+    </div>`;
+}
+
+function renderPurchaseRowHtml(holding, purchase) {
+  const chfAmount = purchase.amount * (purchase.exchangeRate || 1);
+  const d = new Date(purchase.date + 'T00:00:00');
+  const dateStr = dateFmt.format(d);
+  const currencyNote = purchase.currency !== 'CHF' ? ` · ${escapeHtml(purchase.currency)} @ ${purchase.exchangeRate}` : '';
+  return `
+    <div class="purchase-row" data-holding-id="${holding.id}" data-edit-purchase="${purchase.id}">
+      <span class="purchase-row-main">${dateStr} · ${formatQuantity(purchase.quantity)} Stk.${currencyNote}</span>
+      <span class="purchase-row-amount">${formatCurrency(chfAmount)}</span>
+    </div>`;
+}
+
+function addNewDepot() {
+  const input = document.getElementById('new-depot-name');
+  const name = input.value.trim();
+  if (!name) return;
+  mutate(`Depot "${name}" hinzugefügt`, () => {
+    data.depots.push({ id: uid(), name, holdings: [] });
+  });
+  input.value = '';
+}
+
+function renameDepot(depotId, newName) {
+  const depot = findDepot(depotId);
+  if (!depot) return;
+  const oldName = depot.name;
+  mutate(`Depot "${oldName}" umbenannt in "${newName}"`, () => {
+    depot.name = newName;
+  });
+}
+
+function deleteDepot(depotId) {
+  const depot = findDepot(depotId);
+  if (!depot) return;
+  mutate(`Depot "${depot.name}" gelöscht`, () => {
+    data.depots = data.depots.filter(d => d.id !== depotId);
+  });
+}
+
+function addHoldingToDepot(depotId, name, type) {
+  name = name.trim();
+  if (!name) return;
+  const depot = findDepot(depotId);
+  if (!depot) return;
+  mutate(`Position "${name}" zu Depot "${depot.name}" hinzugefügt`, () => {
+    depot.holdings.push({ id: uid(), name, type: type || 'Sonstiges', currentValue: null, expanded: true, purchases: [] });
+  });
+}
+
+function renameHolding(holdingId, newName) {
+  const found = findHolding(holdingId);
+  if (!found) return;
+  const oldName = found.holding.name;
+  mutate(`Position "${oldName}" umbenannt in "${newName}"`, () => {
+    found.holding.name = newName;
+  });
+}
+
+function deleteHolding(holdingId) {
+  const found = findHolding(holdingId);
+  if (!found) return;
+  mutate(`Position "${found.holding.name}" gelöscht`, () => {
+    found.depot.holdings = found.depot.holdings.filter(h => h.id !== holdingId);
+  });
+}
+
+function toggleHoldingExpanded(holdingId) {
+  const found = findHolding(holdingId);
+  if (!found) return;
+  found.holding.expanded = !found.holding.expanded;
+  saveData();
+  renderDepotView();
+}
+
+function openPurchaseModal(holdingId, purchaseId) {
+  const found = findHolding(holdingId);
+  if (!found) return;
+  const form = document.getElementById('purchase-form');
+  form.dataset.holdingId = holdingId;
+  form.dataset.purchaseId = purchaseId || '';
+  const deleteBtn = document.getElementById('btn-delete-purchase');
+
+  if (purchaseId) {
+    const purchase = found.holding.purchases.find(p => p.id === purchaseId);
+    if (!purchase) return;
+    document.getElementById('purchase-modal-title').textContent = 'Kauf bearbeiten';
+    document.getElementById('purchase-date').value = purchase.date;
+    document.getElementById('purchase-quantity').value = purchase.quantity;
+    document.getElementById('purchase-amount').value = purchase.amount;
+    document.getElementById('purchase-currency').value = purchase.currency;
+    document.getElementById('purchase-exchange-rate').value = purchase.exchangeRate;
+    deleteBtn.classList.remove('hidden');
+  } else {
+    document.getElementById('purchase-modal-title').textContent = 'Kauf hinzufügen';
+    document.getElementById('purchase-date').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('purchase-quantity').value = '';
+    document.getElementById('purchase-amount').value = '';
+    document.getElementById('purchase-currency').value = 'CHF';
+    document.getElementById('purchase-exchange-rate').value = 1;
+    deleteBtn.classList.add('hidden');
+  }
+
+  openModal('purchase-modal');
+}
+
+function handlePurchaseSubmit(e) {
+  e.preventDefault();
+  const form = document.getElementById('purchase-form');
+  const holdingId = form.dataset.holdingId;
+  const purchaseId = form.dataset.purchaseId;
+  const found = findHolding(holdingId);
+  if (!found) return;
+
+  const date = document.getElementById('purchase-date').value;
+  const quantity = parseFloat(document.getElementById('purchase-quantity').value);
+  const amount = parseFloat(document.getElementById('purchase-amount').value);
+  const currency = document.getElementById('purchase-currency').value.trim().toUpperCase() || 'CHF';
+  const exchangeRate = parseFloat(document.getElementById('purchase-exchange-rate').value) || 1;
+
+  if (!date || !quantity || quantity <= 0 || !amount || amount <= 0) return;
+
+  const holdingName = found.holding.name;
+
+  if (purchaseId) {
+    mutate(`Kauf bei "${holdingName}" bearbeitet`, () => {
+      const purchase = found.holding.purchases.find(p => p.id === purchaseId);
+      Object.assign(purchase, { date, quantity, amount, currency, exchangeRate });
+    });
+  } else {
+    mutate(`Kauf bei "${holdingName}" hinzugefügt (${formatQuantity(quantity)} Stk.)`, () => {
+      found.holding.purchases.push({ id: uid(), date, quantity, amount, currency, exchangeRate });
+    });
+  }
+
+  closeModal('purchase-modal');
+}
+
+function deleteCurrentPurchase() {
+  const form = document.getElementById('purchase-form');
+  const holdingId = form.dataset.holdingId;
+  const purchaseId = form.dataset.purchaseId;
+  if (!purchaseId) return;
+  const found = findHolding(holdingId);
+  if (!found) return;
+
+  mutate(`Kauf bei "${found.holding.name}" gelöscht`, () => {
+    found.holding.purchases = found.holding.purchases.filter(p => p.id !== purchaseId);
+  });
+  closeModal('purchase-modal');
+}
+
+function openCurrentValueModal(holdingId) {
+  const found = findHolding(holdingId);
+  if (!found) return;
+  document.getElementById('current-value-form').dataset.holdingId = holdingId;
+  document.getElementById('current-value-input').value = found.holding.currentValue != null ? found.holding.currentValue : '';
+  openModal('current-value-modal');
+}
+
+function handleCurrentValueSubmit(e) {
+  e.preventDefault();
+  const holdingId = document.getElementById('current-value-form').dataset.holdingId;
+  const found = findHolding(holdingId);
+  if (!found) return;
+  const value = parseFloat(document.getElementById('current-value-input').value);
+  if (isNaN(value) || value < 0) return;
+
+  mutate(`Aktueller Wert von "${found.holding.name}" auf ${formatCurrency(value)} gesetzt`, () => {
+    found.holding.currentValue = value;
+  });
+  closeModal('current-value-modal');
+}
+
 function renderReportView() {
   document.getElementById('current-year').textContent = String(state.reportYear);
 
@@ -1188,6 +1531,7 @@ function render() {
   if (state.view === 'budget') renderBudgetView();
   if (state.view === 'accounts') renderAccountsView();
   if (state.view === 'report') renderReportView();
+  if (state.view === 'depot') renderDepotView();
 }
 
 function setView(view) {
@@ -1199,12 +1543,14 @@ function setView(view) {
   document.getElementById('capture-view').classList.toggle('hidden', view !== 'capture');
   document.getElementById('budget-view').classList.toggle('hidden', view !== 'budget');
   document.getElementById('accounts-view').classList.toggle('hidden', view !== 'accounts');
+  document.getElementById('depot-view').classList.toggle('hidden', view !== 'depot');
   document.getElementById('report-view').classList.toggle('hidden', view !== 'report');
   document.querySelector('.month-nav').classList.toggle('hidden', view === 'report');
   document.querySelector('.summary').classList.toggle('hidden', view === 'report');
   if (view === 'budget') renderBudgetView();
   if (view === 'accounts') renderAccountsView();
   if (view === 'report') renderReportView();
+  if (view === 'depot') renderDepotView();
 }
 
 function populateCategorySelect(type) {
@@ -1565,6 +1911,14 @@ function init() {
   document.getElementById('new-account-balance').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); addNewAccount(); }
   });
+
+  document.getElementById('btn-add-depot').addEventListener('click', addNewDepot);
+  document.getElementById('new-depot-name').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); addNewDepot(); }
+  });
+  document.getElementById('purchase-form').addEventListener('submit', handlePurchaseSubmit);
+  document.getElementById('btn-delete-purchase').addEventListener('click', deleteCurrentPurchase);
+  document.getElementById('current-value-form').addEventListener('submit', handleCurrentValueSubmit);
 
   document.querySelectorAll('.modal-close').forEach(btn => {
     btn.addEventListener('click', () => closeModal(btn.dataset.close));
