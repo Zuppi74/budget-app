@@ -86,7 +86,8 @@ const state = {
   month: today.getMonth(),
   reportYear: today.getFullYear(),
   currentType: 'expense',
-  view: 'overview'
+  view: 'overview',
+  entryFilters: { dateFrom: '', dateTo: '', category: 'all', account: 'all', label: 'all' }
 };
 
 function structuredCloneData(obj) {
@@ -361,10 +362,77 @@ function renderSummary(entries) {
   balanceEl.style.color = balance < 0 ? 'var(--expense)' : 'var(--income)';
 }
 
+function isEntryFilterActive() {
+  const f = state.entryFilters;
+  return !!(f.dateFrom || f.dateTo || f.category !== 'all' || f.account !== 'all' || f.label !== 'all');
+}
+
+function getFilteredEntries(monthEntries) {
+  if (!isEntryFilterActive()) return monthEntries;
+  const f = state.entryFilters;
+  return data.entries
+    .filter(e => {
+      if (f.dateFrom && e.date < f.dateFrom) return false;
+      if (f.dateTo && e.date > f.dateTo) return false;
+      if (f.category !== 'all' && e.category !== f.category) return false;
+      if (f.account !== 'all' && e.account !== f.account) return false;
+      if (f.label !== 'all' && (e.label || '') !== f.label) return false;
+      return true;
+    })
+    .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+function populateEntryFilters() {
+  const categorySelect = document.getElementById('filter-category');
+  const prevCat = categorySelect.value || 'all';
+  const expenseOptions = data.categoryGroups.map(group => {
+    const opts = group.categories.map(c => `<option value="${c.id}">${c.icon ? c.icon + ' ' : ''}${escapeHtml(c.name)}</option>`).join('');
+    return `<optgroup label="${escapeHtml(group.name)}">${opts}</optgroup>`;
+  }).join('');
+  const incomeOptions = `<optgroup label="Einnahmen">${data.incomeCategories.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')}</optgroup>`;
+  categorySelect.innerHTML = `<option value="all">Alle Kategorien</option>${expenseOptions}${incomeOptions}`;
+  categorySelect.value = prevCat;
+
+  const accountSelect = document.getElementById('filter-account');
+  const prevAcc = accountSelect.value || 'all';
+  accountSelect.innerHTML = '<option value="all">Alle Konten</option>' +
+    data.accounts.map(a => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('');
+  accountSelect.value = prevAcc;
+
+  const labelSelect = document.getElementById('filter-label');
+  const prevLabel = labelSelect.value || 'all';
+  const labels = Array.from(new Set(data.entries.map(e => e.label).filter(Boolean))).sort();
+  labelSelect.innerHTML = '<option value="all">Alle Labels</option>' +
+    labels.map(l => `<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`).join('');
+  labelSelect.value = prevLabel;
+}
+
+function readEntryFiltersFromInputs() {
+  state.entryFilters = {
+    dateFrom: document.getElementById('filter-date-from').value,
+    dateTo: document.getElementById('filter-date-to').value,
+    category: document.getElementById('filter-category').value,
+    account: document.getElementById('filter-account').value,
+    label: document.getElementById('filter-label').value
+  };
+  render();
+}
+
+function clearEntryFilters() {
+  document.getElementById('filter-date-from').value = '';
+  document.getElementById('filter-date-to').value = '';
+  document.getElementById('filter-category').value = 'all';
+  document.getElementById('filter-account').value = 'all';
+  document.getElementById('filter-label').value = 'all';
+  state.entryFilters = { dateFrom: '', dateTo: '', category: 'all', account: 'all', label: 'all' };
+  render();
+}
+
 function renderEntries(entries) {
   const container = document.getElementById('entries-list');
   if (entries.length === 0) {
-    container.innerHTML = '<p class="empty-hint">Keine Einträge in diesem Monat.</p>';
+    const message = isEntryFilterActive() ? 'Keine Einträge gefunden.' : 'Keine Einträge in diesem Monat.';
+    container.innerHTML = `<p class="empty-hint">${message}</p>`;
     return;
   }
 
@@ -1523,7 +1591,7 @@ function render() {
   renderMonthLabel();
   const entries = getEntriesForCurrentMonth();
   renderSummary(entries);
-  renderEntries(entries);
+  renderEntries(getFilteredEntries(entries));
   renderAccountBalancesPanel();
   renderBarChart(entries);
   renderChart(entries);
@@ -1551,6 +1619,7 @@ function setView(view) {
   if (view === 'accounts') renderAccountsView();
   if (view === 'report') renderReportView();
   if (view === 'depot') renderDepotView();
+  if (view === 'capture') { populateEntryFilters(); renderEntries(getFilteredEntries(getEntriesForCurrentMonth())); }
 }
 
 function populateCategorySelect(type) {
@@ -1874,6 +1943,11 @@ function init() {
 
   document.getElementById('btn-add-entry').addEventListener('click', () => openEntryModal(null));
 
+  ['filter-date-from', 'filter-date-to', 'filter-category', 'filter-account', 'filter-label'].forEach(id => {
+    document.getElementById(id).addEventListener('change', readEntryFiltersFromInputs);
+  });
+  document.getElementById('btn-clear-filters').addEventListener('click', clearEntryFilters);
+
   document.getElementById('btn-settings').addEventListener('click', () => {
     renderSettings();
     openModal('settings-modal');
@@ -1969,6 +2043,7 @@ function init() {
   updateUndoRedoButtons();
   carryForwardBudgets();
   generateRecurringEntriesForMonth(state.year, state.month);
+  populateEntryFilters();
   render();
 }
 

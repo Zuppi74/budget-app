@@ -105,6 +105,14 @@
           <button id="btn-add-entry" class="btn-primary">+ Eintrag</button>
         </div>
       </div>
+      <div id="entry-filters" class="entry-filters">
+        <input type="date" id="filter-date-from" title="Von Datum">
+        <input type="date" id="filter-date-to" title="Bis Datum">
+        <select id="filter-category" title="Kategorie"></select>
+        <select id="filter-account" title="Konto"></select>
+        <select id="filter-label" title="Label"></select>
+        <button type="button" id="btn-clear-filters" class="btn-secondary">Zurücksetzen</button>
+      </div>
       <div id="entries-list" class="entries-list">
         <p class="empty-hint">Keine Einträge in diesem Monat.</p>
       </div>
