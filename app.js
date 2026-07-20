@@ -1614,7 +1614,7 @@ function setView(view) {
   document.getElementById('depot-view').classList.toggle('hidden', view !== 'depot');
   document.getElementById('report-view').classList.toggle('hidden', view !== 'report');
   document.querySelector('.month-nav').classList.toggle('hidden', view === 'report');
-  document.querySelector('.summary').classList.toggle('hidden', view === 'report');
+  document.querySelector('.summary').classList.toggle('hidden', view === 'report' || view === 'depot');
   if (view === 'budget') renderBudgetView();
   if (view === 'accounts') renderAccountsView();
   if (view === 'report') renderReportView();
