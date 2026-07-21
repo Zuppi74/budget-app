@@ -1837,7 +1837,6 @@ function setView(view) {
   document.getElementById('report-view').classList.toggle('hidden', view !== 'report');
   document.querySelector('.month-nav').classList.toggle('hidden', view === 'report' || view === 'forecast');
   document.querySelector('.summary').classList.toggle('hidden', view === 'report' || view === 'depot' || view === 'forecast');
-  document.querySelector('.summary').classList.toggle('compact', view === 'capture');
   if (view === 'budget') renderBudgetView();
   if (view === 'accounts') renderAccountsView();
   if (view === 'report') renderReportView();
