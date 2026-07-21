@@ -1577,7 +1577,7 @@ body {
 
 .holding-stats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
   gap: 10px;
   margin-bottom: 8px;
 }
@@ -1586,6 +1586,9 @@ body {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  /* Ohne min-width: 0 behalten Grid-Items ihre Inhaltsbreite und
+     lange Beträge laufen in die Nachbarspalte. */
+  min-width: 0;
 }
 
 .holding-stat.editable { cursor: pointer; }
@@ -1601,6 +1604,7 @@ body {
 .holding-stat-value {
   font-size: 0.88rem;
   font-weight: 600;
+  overflow-wrap: break-word;
 }
 
 .holding-stat-value.positive { color: var(--income); }
