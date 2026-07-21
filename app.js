@@ -1871,6 +1871,44 @@ function exportData() {
   URL.revokeObjectURL(url);
 }
 
+function csvEscape(value) {
+  const str = String(value);
+  if (str.includes(';') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+    return '"' + str.replace(/"/g, '""') + '"';
+  }
+  return str;
+}
+
+function exportEntriesAsCsv() {
+  const header = ['Datum', 'Typ', 'Kategorie', 'Konto', 'Label', 'Notiz', 'Betrag (CHF)'];
+
+  const rows = data.entries
+    .slice()
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map(e => {
+      const typeLabel = e.type === 'income' ? 'Einnahme' : 'Ausgabe';
+      const categoryLabel = getEntryCategoryLabel(e);
+      const accountLabel = e.account ? getAccountName(e.account) : '';
+      const signedAmount = e.type === 'income' ? e.amount : -e.amount;
+      const amountStr = signedAmount.toFixed(2).replace('.', ',');
+      return [e.date, typeLabel, categoryLabel, accountLabel, e.label || '', e.note || '', amountStr];
+    });
+
+  const csvLines = [header, ...rows].map(row => row.map(csvEscape).join(';'));
+  const csvContent = '﻿' + csvLines.join('\r\n');
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const dateStr = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `budget-app-eintraege-${dateStr}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 function isValidImportedData(obj) {
   return obj && Array.isArray(obj.categoryGroups) && Array.isArray(obj.entries) && Array.isArray(obj.incomeCategories);
 }
@@ -1971,6 +2009,7 @@ function init() {
   });
 
   document.getElementById('btn-export').addEventListener('click', exportData);
+  document.getElementById('btn-export-csv').addEventListener('click', exportEntriesAsCsv);
   document.getElementById('btn-import').addEventListener('click', () => {
     document.getElementById('import-file-input').click();
   });
