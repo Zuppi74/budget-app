@@ -1786,7 +1786,7 @@ function renderExpenseTrendChart(monthly) {
   }).join('');
 
   const avg = active.reduce((s, m) => s + m.expense, 0) / active.length;
-  const avgLine = `<line x1="${padL}" y1="${yFor(avg).toFixed(1)}" x2="${W - padR}" y2="${yFor(avg).toFixed(1)}" stroke="var(--text-muted)" stroke-width="1" stroke-dasharray="4 3"></line>`;
+  const avgLine = `<line x1="${padL}" y1="${yFor(avg).toFixed(1)}" x2="${W - padR}" y2="${yFor(avg).toFixed(1)}" stroke="var(--text-muted)" stroke-width="1" stroke-dasharray="4 3" vector-effect="non-scaling-stroke"></line>`;
 
   const fit = linearFit(active.map(m => ({ x: m.month, y: m.expense })));
   let trendLine = '';
@@ -1795,7 +1795,7 @@ function renderExpenseTrendChart(monthly) {
   if (fit) {
     const first = active[0].month;
     const last = active[active.length - 1].month;
-    trendLine = `<line x1="${xCenter(first).toFixed(1)}" y1="${yFor(fit.slope * first + fit.intercept).toFixed(1)}" x2="${xCenter(last).toFixed(1)}" y2="${yFor(fit.slope * last + fit.intercept).toFixed(1)}" stroke="var(--chart-4)" stroke-width="2" stroke-linecap="round"></line>`;
+    trendLine = `<line x1="${xCenter(first).toFixed(1)}" y1="${yFor(fit.slope * first + fit.intercept).toFixed(1)}" x2="${xCenter(last).toFixed(1)}" y2="${yFor(fit.slope * last + fit.intercept).toFixed(1)}" stroke="var(--chart-4)" stroke-width="2" stroke-linecap="round" vector-effect="non-scaling-stroke"></line>`;
 
     const perMonth = formatCurrency(Math.abs(fit.slope));
     if (Math.abs(fit.slope) < 0.005) {
@@ -1811,12 +1811,12 @@ function renderExpenseTrendChart(monthly) {
   // sie mitskalieren und je nach Bildschirmbreite zu gross oder zu klein.
   const labels = MONTH_SHORT.map(name => `<span>${name}</span>`).join('');
 
-  const baseline = `<line x1="${padL}" y1="${baseY}" x2="${W - padR}" y2="${baseY}" stroke="var(--border)" stroke-width="1"></line>`;
+  const baseline = `<line x1="${padL}" y1="${baseY}" x2="${W - padR}" y2="${baseY}" stroke="var(--border)" stroke-width="1" vector-effect="non-scaling-stroke"></line>`;
 
   const trendClass = !fit ? 'neutral' : fit.slope > 0.005 ? 'up' : fit.slope < -0.005 ? 'down' : 'neutral';
 
   container.innerHTML = `
-    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Ausgaben pro Monat mit Trendlinie">
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Ausgaben pro Monat mit Trendlinie">
       ${baseline}${bars}${avgLine}${trendLine}
     </svg>
     <div class="trend-months">${labels}</div>

@@ -1636,10 +1636,18 @@ body {
 
 /* ---------- Ausgaben-Trend (Auswertung) ---------- */
 
+/* Feste Höhe statt proportionalem Mitskalieren: sonst wird das
+   Diagramm auf breiten Bildschirmen unnötig hoch. */
 .trend-chart svg {
   display: block;
   width: 100%;
-  height: auto;
+  height: 150px;
+}
+
+/* Muss nach der Basisregel stehen - der allgemeine Mobile-Block weiter
+   oben in dieser Datei würde bei gleicher Spezifität verlieren. */
+@media (max-width: 600px) {
+  .trend-chart svg { height: 120px; }
 }
 
 /* Gleiche seitliche Einrückung wie das SVG (8 von 360 Einheiten),
