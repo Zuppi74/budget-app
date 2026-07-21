@@ -36,6 +36,7 @@
     <button class="tab-btn" data-view="budget">Budget</button>
     <button class="tab-btn" data-view="accounts">Konten</button>
     <button class="tab-btn" data-view="depot">Depot</button>
+    <button class="tab-btn" data-view="forecast">Forecast</button>
     <button class="tab-btn" data-view="report">Auswertung</button>
   </div>
 
@@ -187,6 +188,55 @@
     <option value="EUR">
     <option value="GBP">
   </datalist>
+
+  <section id="forecast-view" class="forecast-view hidden">
+    <div class="summary">
+      <div class="summary-card">
+        <span class="summary-label">Geplante Einnahmen (Jahr)</span>
+        <span id="forecast-income-total" class="summary-value">CHF 0.00</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-label">Geplante Ausgaben (Jahr)</span>
+        <span id="forecast-expense-total" class="summary-value">CHF 0.00</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-label">Saldo (Jahr)</span>
+        <span id="forecast-saldo-total" class="summary-value">CHF 0.00</span>
+      </div>
+    </div>
+
+    <div class="panel report-panel">
+      <table class="report-table forecast-table">
+        <thead>
+          <tr>
+            <th>Monat</th>
+            <th>Einnahmen</th>
+            <th>Ausgaben</th>
+            <th>Saldo</th>
+            <th>Kumuliert</th>
+          </tr>
+        </thead>
+        <tbody id="forecast-table-body"></tbody>
+        <tfoot id="forecast-table-foot"></tfoot>
+      </table>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <h2>Ausgaben-Positionen</h2>
+        <button type="button" id="btn-add-forecast-expense" class="btn-secondary">+ Position</button>
+      </div>
+      <div id="forecast-expense-list" class="forecast-list"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <h2>Einnahmen-Positionen</h2>
+        <button type="button" id="btn-add-forecast-income" class="btn-secondary">+ Position</button>
+      </div>
+      <div id="forecast-income-list" class="forecast-list"></div>
+    </div>
+  </section>
 
   <section id="report-view" class="report-view hidden">
     <nav class="year-nav">
@@ -359,6 +409,44 @@
       <label for="current-value-input">Aktueller Gesamtwert der Position (CHF)</label>
       <input type="number" id="current-value-input" step="0.01" min="0" required>
       <div class="modal-actions">
+        <button type="submit" class="btn-primary">Speichern</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="forecast-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="forecast-modal-title">Position hinzufügen</h3>
+      <button class="icon-btn modal-close" data-close="forecast-modal" aria-label="Schließen">✕</button>
+    </div>
+    <form id="forecast-form">
+      <input type="hidden" id="forecast-id">
+
+      <div class="type-toggle">
+        <button type="button" class="forecast-type-btn active" data-forecast-type="expense">Ausgabe</button>
+        <button type="button" class="forecast-type-btn" data-forecast-type="income">Einnahme</button>
+      </div>
+
+      <label for="forecast-name">Bezeichnung</label>
+      <input type="text" id="forecast-name" placeholder="z. B. Steuern, Versicherung" required>
+
+      <label for="forecast-amount">Betrag pro Monat (CHF)</label>
+      <input type="number" id="forecast-amount" step="0.01" min="0" placeholder="0,00" required>
+
+      <label>Fällige Monate</label>
+      <div class="forecast-presets">
+        <button type="button" class="btn-chip" data-forecast-preset="all">Jeden Monat</button>
+        <button type="button" class="btn-chip" data-forecast-preset="quarter">Quartalsweise</button>
+        <button type="button" class="btn-chip" data-forecast-preset="half">Halbjährlich</button>
+        <button type="button" class="btn-chip" data-forecast-preset="none">Zurücksetzen</button>
+      </div>
+      <div id="forecast-month-grid" class="forecast-month-grid"></div>
+      <p id="forecast-month-hint" class="forecast-month-hint hidden">Bitte mindestens einen Monat auswählen.</p>
+
+      <div class="modal-actions">
+        <button type="button" id="btn-delete-forecast" class="btn-danger hidden">Löschen</button>
         <button type="submit" class="btn-primary">Speichern</button>
       </div>
     </form>

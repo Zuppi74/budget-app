@@ -43,6 +43,7 @@ const DEFAULT_DATA = {
   entries: [],
   recurring: [],
   depots: [],
+  forecast: { positions: [] },
   recentMoves: []
 };
 
@@ -113,7 +114,7 @@ function migrateOldData(old) {
     }
     return e;
   });
-  return ensureAccounts({ categoryGroups, incomeCategories, budgets: {}, entries, recurring: [], depots: [], recentMoves: [] });
+  return ensureAccounts({ categoryGroups, incomeCategories, budgets: {}, entries, recurring: [], depots: [], forecast: { positions: [] }, recentMoves: [] });
 }
 
 function loadData() {
@@ -126,6 +127,8 @@ function loadData() {
         parsed.recentMoves = parsed.recentMoves || [];
         parsed.recurring = parsed.recurring || [];
         parsed.depots = parsed.depots || [];
+        parsed.forecast = parsed.forecast || { positions: [] };
+        parsed.forecast.positions = parsed.forecast.positions || [];
         return ensureAccounts(parsed);
       }
     }
@@ -795,6 +798,7 @@ function rerenderActiveView() {
   if (state.view === 'budget') renderBudgetView();
   else if (state.view === 'accounts') renderAccountsView();
   else if (state.view === 'depot') renderDepotView();
+  else if (state.view === 'forecast') renderForecastView();
 }
 
 function getAllCategoriesFlat() {
@@ -1478,6 +1482,222 @@ function handleCurrentValueSubmit(e) {
   closeModal('current-value-modal');
 }
 
+/* ---------- Forecast (Jahresplanung) ---------- */
+
+const MONTH_SHORT = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+const FORECAST_PRESETS = {
+  all: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+  quarter: [2, 5, 8, 11],
+  half: [5, 11],
+  none: []
+};
+
+function ensureForecast() {
+  if (!data.forecast) data.forecast = { positions: [] };
+  if (!data.forecast.positions) data.forecast.positions = [];
+  return data.forecast;
+}
+
+function getForecastMonthlyTotals() {
+  const income = new Array(12).fill(0);
+  const expense = new Array(12).fill(0);
+  ensureForecast().positions.forEach(p => {
+    const target = p.type === 'income' ? income : expense;
+    (p.months || []).forEach(m => {
+      if (m >= 0 && m < 12) target[m] += p.amount;
+    });
+  });
+  return { income, expense };
+}
+
+function getForecastPositionYearTotal(p) {
+  return p.amount * (p.months ? p.months.length : 0);
+}
+
+function formatMonthsList(months) {
+  if (!months || months.length === 0) return '—';
+  const sorted = months.slice().sort((a, b) => a - b);
+  if (sorted.length === 12) return 'Jeden Monat';
+  return sorted.map(m => MONTH_SHORT[m]).join(', ');
+}
+
+function renderForecastView() {
+  ensureForecast();
+  const { income, expense } = getForecastMonthlyTotals();
+  const yearIncome = income.reduce((a, b) => a + b, 0);
+  const yearExpense = expense.reduce((a, b) => a + b, 0);
+  const yearSaldo = yearIncome - yearExpense;
+
+  document.getElementById('forecast-income-total').textContent = formatCurrency(yearIncome);
+  document.getElementById('forecast-expense-total').textContent = formatCurrency(yearExpense);
+  const saldoEl = document.getElementById('forecast-saldo-total');
+  saldoEl.textContent = formatCurrency(yearSaldo);
+  saldoEl.className = `summary-value ${yearSaldo < 0 ? 'negative' : 'positive'}`;
+
+  let cumulative = 0;
+  const rows = [];
+  for (let m = 0; m < 12; m++) {
+    const saldo = income[m] - expense[m];
+    cumulative += saldo;
+    rows.push(`<tr>
+      <td>${MONTH_SHORT[m]}</td>
+      <td class="col-income">${income[m] ? formatCurrency(income[m]) : '–'}</td>
+      <td class="col-expense">${expense[m] ? formatCurrency(expense[m]) : '–'}</td>
+      <td class="${saldo < 0 ? 'col-expense' : ''}">${formatCurrency(saldo)}</td>
+      <td class="${cumulative < 0 ? 'col-expense' : ''}">${formatCurrency(cumulative)}</td>
+    </tr>`);
+  }
+  document.getElementById('forecast-table-body').innerHTML = rows.join('');
+  document.getElementById('forecast-table-foot').innerHTML = `<tr>
+    <td>Jahr</td>
+    <td class="col-income">${formatCurrency(yearIncome)}</td>
+    <td class="col-expense">${formatCurrency(yearExpense)}</td>
+    <td class="${yearSaldo < 0 ? 'col-expense' : ''}">${formatCurrency(yearSaldo)}</td>
+    <td></td>
+  </tr>`;
+
+  renderForecastPositionList('expense');
+  renderForecastPositionList('income');
+}
+
+function renderForecastPositionList(type) {
+  const container = document.getElementById(type === 'income' ? 'forecast-income-list' : 'forecast-expense-list');
+  const positions = ensureForecast().positions
+    .filter(p => p.type === type)
+    .sort((a, b) => getForecastPositionYearTotal(b) - getForecastPositionYearTotal(a));
+
+  if (positions.length === 0) {
+    container.innerHTML = `<p class="empty-hint">Noch keine ${type === 'income' ? 'Einnahmen' : 'Ausgaben'}-Positionen erfasst.</p>`;
+    return;
+  }
+
+  container.innerHTML = positions.map(renderForecastPositionRow).join('');
+  container.querySelectorAll('[data-edit-forecast]').forEach(el => {
+    el.addEventListener('click', () => openForecastPositionModal(null, el.dataset.editForecast));
+  });
+  container.querySelectorAll('[data-delete-forecast]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteForecastPosition(btn.dataset.deleteForecast);
+    });
+  });
+}
+
+function renderForecastPositionRow(p) {
+  const yearTotal = getForecastPositionYearTotal(p);
+  const perMonth = p.months && p.months.length > 1 ? `je ${formatCurrency(p.amount)}` : formatCurrency(p.amount);
+  return `
+    <div class="forecast-item" data-edit-forecast="${p.id}">
+      <div class="forecast-item-info">
+        <span class="forecast-item-name">${escapeHtml(p.name)}</span>
+        <span class="forecast-item-meta">${escapeHtml(formatMonthsList(p.months))} · ${perMonth}</span>
+      </div>
+      <span class="forecast-item-total ${p.type}">${formatCurrency(yearTotal)}</span>
+      <button type="button" class="icon-btn small" data-delete-forecast="${p.id}" aria-label="Position löschen">✕</button>
+    </div>`;
+}
+
+function setForecastType(type) {
+  document.querySelectorAll('.forecast-type-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.forecastType === type);
+  });
+}
+
+function renderForecastMonthGrid(selected) {
+  const grid = document.getElementById('forecast-month-grid');
+  grid.innerHTML = MONTH_SHORT.map((name, i) =>
+    `<button type="button" class="forecast-month-btn ${selected.includes(i) ? 'active' : ''}" data-month="${i}">${name}</button>`
+  ).join('');
+  grid.querySelectorAll('.forecast-month-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      btn.classList.toggle('active');
+      document.getElementById('forecast-month-hint').classList.add('hidden');
+    });
+  });
+}
+
+function applyForecastPreset(preset) {
+  const months = FORECAST_PRESETS[preset] || [];
+  document.querySelectorAll('#forecast-month-grid .forecast-month-btn').forEach(btn => {
+    btn.classList.toggle('active', months.includes(parseInt(btn.dataset.month, 10)));
+  });
+  document.getElementById('forecast-month-hint').classList.add('hidden');
+}
+
+function openForecastPositionModal(type, positionId) {
+  const form = document.getElementById('forecast-form');
+  form.reset();
+  document.getElementById('forecast-month-hint').classList.add('hidden');
+  const deleteBtn = document.getElementById('btn-delete-forecast');
+  let selectedMonths = [];
+  let posType = type || 'expense';
+
+  if (positionId) {
+    const pos = ensureForecast().positions.find(p => p.id === positionId);
+    if (!pos) return;
+    posType = pos.type;
+    selectedMonths = (pos.months || []).slice();
+    document.getElementById('forecast-modal-title').textContent = 'Position bearbeiten';
+    document.getElementById('forecast-id').value = pos.id;
+    document.getElementById('forecast-name').value = pos.name;
+    document.getElementById('forecast-amount').value = pos.amount;
+    deleteBtn.classList.remove('hidden');
+  } else {
+    document.getElementById('forecast-modal-title').textContent = 'Position hinzufügen';
+    document.getElementById('forecast-id').value = '';
+    deleteBtn.classList.add('hidden');
+  }
+
+  setForecastType(posType);
+  renderForecastMonthGrid(selectedMonths);
+  openModal('forecast-modal');
+}
+
+function handleForecastFormSubmit(e) {
+  e.preventDefault();
+  const id = document.getElementById('forecast-id').value;
+  const name = document.getElementById('forecast-name').value.trim();
+  const amount = parseFloat(document.getElementById('forecast-amount').value);
+  const type = document.querySelector('.forecast-type-btn.active').dataset.forecastType;
+  const months = Array.from(document.querySelectorAll('#forecast-month-grid .forecast-month-btn.active'))
+    .map(btn => parseInt(btn.dataset.month, 10))
+    .sort((a, b) => a - b);
+
+  if (!name || isNaN(amount) || amount <= 0) return;
+  if (months.length === 0) {
+    document.getElementById('forecast-month-hint').classList.remove('hidden');
+    return;
+  }
+
+  ensureForecast();
+  if (id) {
+    mutate(`Forecast-Position "${name}" bearbeitet`, () => {
+      const pos = data.forecast.positions.find(p => p.id === id);
+      if (pos) Object.assign(pos, { type, name, amount, months });
+    });
+  } else {
+    mutate(`Forecast-Position "${name}" hinzugefügt`, () => {
+      data.forecast.positions.push({ id: uid(), type, name, amount, months });
+    });
+  }
+  closeModal('forecast-modal');
+}
+
+function deleteForecastPosition(id) {
+  const pos = ensureForecast().positions.find(p => p.id === id);
+  if (!pos) return;
+  mutate(`Forecast-Position "${pos.name}" gelöscht`, () => {
+    data.forecast.positions = data.forecast.positions.filter(p => p.id !== id);
+  });
+}
+
+function deleteCurrentForecastPosition() {
+  const id = document.getElementById('forecast-id').value;
+  if (!id) return;
+  deleteForecastPosition(id);
+  closeModal('forecast-modal');
+}
+
 function renderReportView() {
   document.getElementById('current-year').textContent = String(state.reportYear);
 
@@ -1600,6 +1820,7 @@ function render() {
   if (state.view === 'accounts') renderAccountsView();
   if (state.view === 'report') renderReportView();
   if (state.view === 'depot') renderDepotView();
+  if (state.view === 'forecast') renderForecastView();
 }
 
 function setView(view) {
@@ -1612,13 +1833,15 @@ function setView(view) {
   document.getElementById('budget-view').classList.toggle('hidden', view !== 'budget');
   document.getElementById('accounts-view').classList.toggle('hidden', view !== 'accounts');
   document.getElementById('depot-view').classList.toggle('hidden', view !== 'depot');
+  document.getElementById('forecast-view').classList.toggle('hidden', view !== 'forecast');
   document.getElementById('report-view').classList.toggle('hidden', view !== 'report');
-  document.querySelector('.month-nav').classList.toggle('hidden', view === 'report');
-  document.querySelector('.summary').classList.toggle('hidden', view === 'report' || view === 'depot');
+  document.querySelector('.month-nav').classList.toggle('hidden', view === 'report' || view === 'forecast');
+  document.querySelector('.summary').classList.toggle('hidden', view === 'report' || view === 'depot' || view === 'forecast');
   if (view === 'budget') renderBudgetView();
   if (view === 'accounts') renderAccountsView();
   if (view === 'report') renderReportView();
   if (view === 'depot') renderDepotView();
+  if (view === 'forecast') renderForecastView();
   if (view === 'capture') { populateEntryFilters(); renderEntries(getFilteredEntries(getEntriesForCurrentMonth())); }
 }
 
@@ -2032,6 +2255,17 @@ function init() {
   document.getElementById('purchase-form').addEventListener('submit', handlePurchaseSubmit);
   document.getElementById('btn-delete-purchase').addEventListener('click', deleteCurrentPurchase);
   document.getElementById('current-value-form').addEventListener('submit', handleCurrentValueSubmit);
+
+  document.getElementById('btn-add-forecast-expense').addEventListener('click', () => openForecastPositionModal('expense', null));
+  document.getElementById('btn-add-forecast-income').addEventListener('click', () => openForecastPositionModal('income', null));
+  document.getElementById('forecast-form').addEventListener('submit', handleForecastFormSubmit);
+  document.getElementById('btn-delete-forecast').addEventListener('click', deleteCurrentForecastPosition);
+  document.querySelectorAll('.forecast-type-btn').forEach(btn => {
+    btn.addEventListener('click', () => setForecastType(btn.dataset.forecastType));
+  });
+  document.querySelectorAll('[data-forecast-preset]').forEach(btn => {
+    btn.addEventListener('click', () => applyForecastPreset(btn.dataset.forecastPreset));
+  });
 
   document.querySelectorAll('.modal-close').forEach(btn => {
     btn.addEventListener('click', () => closeModal(btn.dataset.close));

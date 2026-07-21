@@ -673,7 +673,8 @@ body {
 #entry-form,
 #transfer-form,
 #purchase-form,
-#current-value-form {
+#current-value-form,
+#forecast-form {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -682,7 +683,8 @@ body {
 #entry-form label,
 #transfer-form label,
 #purchase-form label,
-#current-value-form label {
+#current-value-form label,
+#forecast-form label {
   font-size: 0.82rem;
   color: var(--text-muted);
   margin-top: 10px;
@@ -693,7 +695,8 @@ body {
 #transfer-form input,
 #transfer-form select,
 #purchase-form input,
-#current-value-form input {
+#current-value-form input,
+#forecast-form > input {
   padding: 9px 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -750,7 +753,8 @@ body {
   overflow: hidden;
 }
 
-.type-btn {
+.type-btn,
+.forecast-type-btn {
   flex: 1;
   padding: 9px 0;
   background: var(--surface);
@@ -760,7 +764,8 @@ body {
   color: var(--text-muted);
 }
 
-.type-btn.active {
+.type-btn.active,
+.forecast-type-btn.active {
   background: var(--accent);
   color: #fff;
 }
@@ -1608,3 +1613,114 @@ body {
 
 .purchase-row-main { color: var(--text-muted); }
 .purchase-row-amount { font-weight: 600; white-space: nowrap; }
+
+/* ---------- Forecast (Jahresplanung) ---------- */
+
+.forecast-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.forecast-table .col-income { color: var(--income); }
+.forecast-table .col-expense { color: var(--expense); }
+.forecast-table tfoot td {
+  font-weight: 700;
+  border-top: 2px solid var(--border);
+}
+
+.forecast-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.forecast-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.forecast-item:hover { background: var(--bg); }
+
+.forecast-item-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.forecast-item-name { font-weight: 500; font-size: 0.92rem; }
+
+.forecast-item-meta {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.forecast-item-total {
+  font-weight: 600;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.forecast-item-total.income { color: var(--income); }
+.forecast-item-total.expense { color: var(--expense); }
+
+.forecast-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 10px;
+}
+
+.btn-chip {
+  padding: 5px 10px;
+  font-size: 0.78rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.btn-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.forecast-month-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+
+.forecast-month-btn {
+  padding: 8px 0;
+  font-size: 0.82rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.forecast-month-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.forecast-month-hint {
+  margin-top: 8px;
+  font-size: 0.8rem;
+  color: var(--danger);
+}
+
+@media (max-width: 520px) {
+  .forecast-month-grid { grid-template-columns: repeat(4, 1fr); }
+}
