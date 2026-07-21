@@ -1634,6 +1634,73 @@ body {
 .purchase-row-main { color: var(--text-muted); }
 .purchase-row-amount { font-weight: 600; white-space: nowrap; }
 
+/* ---------- Ausgaben-Trend (Auswertung) ---------- */
+
+.trend-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Gleiche seitliche Einrückung wie das SVG (8 von 360 Einheiten),
+   damit die Namen unter ihren Säulen stehen. */
+.trend-months {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  padding: 0 2.22%;
+  margin-top: 4px;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.trend-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-top: 12px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.trend-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.trend-swatch {
+  width: 14px;
+  flex-shrink: 0;
+}
+
+.trend-swatch.bar {
+  height: 10px;
+  border-radius: 2px;
+  background: var(--expense);
+  opacity: 0.8;
+}
+
+.trend-swatch.avg {
+  height: 0;
+  border-top: 1px dashed var(--text-muted);
+}
+
+.trend-swatch.trend {
+  height: 0;
+  border-top: 2px solid var(--chart-4);
+}
+
+.trend-caption {
+  margin-top: 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.trend-caption.up { color: var(--expense); }
+.trend-caption.down { color: var(--income); }
+.trend-caption.neutral { color: var(--text-muted); }
+
 /* ---------- Forecast (Jahresplanung) ---------- */
 
 .forecast-view {

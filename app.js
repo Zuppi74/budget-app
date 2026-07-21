@@ -1737,7 +1737,95 @@ function renderReportView() {
       <td style="color:${totalBalance < 0 ? 'var(--expense)' : 'var(--income)'}">${formatCurrency(totalBalance)}</td>
     </tr>`;
 
+  renderExpenseTrendChart(monthly);
   renderReportCategoryTable();
+}
+
+/* Lineare Regression über die Monatswerte: liefert Steigung und
+   Achsenabschnitt für die Trendlinie. */
+function linearFit(points) {
+  const n = points.length;
+  if (n < 2) return null;
+  const sumX = points.reduce((s, p) => s + p.x, 0);
+  const sumY = points.reduce((s, p) => s + p.y, 0);
+  const sumXY = points.reduce((s, p) => s + p.x * p.y, 0);
+  const sumXX = points.reduce((s, p) => s + p.x * p.x, 0);
+  const denom = n * sumXX - sumX * sumX;
+  if (denom === 0) return null;
+  const slope = (n * sumXY - sumX * sumY) / denom;
+  return { slope, intercept: (sumY - slope * sumX) / n };
+}
+
+function renderExpenseTrendChart(monthly) {
+  const container = document.getElementById('report-trend-chart');
+
+  // Monate ganz ohne Buchungen sind "keine Daten", nicht "null Ausgaben" -
+  // sie würden Durchschnitt und Trend sonst verfälschen.
+  const active = monthly.filter(m => m.income > 0 || m.expense > 0);
+
+  if (active.length === 0 || active.every(m => m.expense === 0)) {
+    container.innerHTML = '<p class="empty-hint">Keine Ausgaben in diesem Jahr.</p>';
+    return;
+  }
+
+  const W = 360, H = 176;
+  const padL = 8, padR = 8, padT = 10, padB = 6;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+  const slot = plotW / 12;
+  const barW = slot * 0.56;
+  const baseY = padT + plotH;
+  const maxValue = Math.max(...monthly.map(m => m.expense), 1);
+  const xCenter = i => padL + slot * (i + 0.5);
+  const yFor = v => baseY - (Math.min(Math.max(v, 0), maxValue) / maxValue) * plotH;
+
+  const bars = monthly.map((m, i) => {
+    if (m.expense <= 0) return '';
+    const h = Math.max((m.expense / maxValue) * plotH, 2);
+    return `<rect x="${(xCenter(i) - barW / 2).toFixed(1)}" y="${(baseY - h).toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="var(--expense)" opacity="0.8"></rect>`;
+  }).join('');
+
+  const avg = active.reduce((s, m) => s + m.expense, 0) / active.length;
+  const avgLine = `<line x1="${padL}" y1="${yFor(avg).toFixed(1)}" x2="${W - padR}" y2="${yFor(avg).toFixed(1)}" stroke="var(--text-muted)" stroke-width="1" stroke-dasharray="4 3"></line>`;
+
+  const fit = linearFit(active.map(m => ({ x: m.month, y: m.expense })));
+  let trendLine = '';
+  let trendCaption = 'Für eine Trendlinie braucht es mindestens zwei Monate mit Buchungen.';
+
+  if (fit) {
+    const first = active[0].month;
+    const last = active[active.length - 1].month;
+    trendLine = `<line x1="${xCenter(first).toFixed(1)}" y1="${yFor(fit.slope * first + fit.intercept).toFixed(1)}" x2="${xCenter(last).toFixed(1)}" y2="${yFor(fit.slope * last + fit.intercept).toFixed(1)}" stroke="var(--chart-4)" stroke-width="2" stroke-linecap="round"></line>`;
+
+    const perMonth = formatCurrency(Math.abs(fit.slope));
+    if (Math.abs(fit.slope) < 0.005) {
+      trendCaption = 'Trend: stabil – die Ausgaben bleiben über das Jahr etwa gleich.';
+    } else if (fit.slope > 0) {
+      trendCaption = `Trend: steigend – im Schnitt ${perMonth} mehr pro Monat.`;
+    } else {
+      trendCaption = `Trend: fallend – im Schnitt ${perMonth} weniger pro Monat.`;
+    }
+  }
+
+  // Die Monatsnamen stehen bewusst als HTML unter dem SVG: im SVG würden
+  // sie mitskalieren und je nach Bildschirmbreite zu gross oder zu klein.
+  const labels = MONTH_SHORT.map(name => `<span>${name}</span>`).join('');
+
+  const baseline = `<line x1="${padL}" y1="${baseY}" x2="${W - padR}" y2="${baseY}" stroke="var(--border)" stroke-width="1"></line>`;
+
+  const trendClass = !fit ? 'neutral' : fit.slope > 0.005 ? 'up' : fit.slope < -0.005 ? 'down' : 'neutral';
+
+  container.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Ausgaben pro Monat mit Trendlinie">
+      ${baseline}${bars}${avgLine}${trendLine}
+    </svg>
+    <div class="trend-months">${labels}</div>
+    <div class="trend-legend">
+      <span class="trend-legend-item"><span class="trend-swatch bar"></span>Ausgaben pro Monat</span>
+      <span class="trend-legend-item"><span class="trend-swatch avg"></span>Durchschnitt ${formatCurrency(avg)}</span>
+      <span class="trend-legend-item"><span class="trend-swatch trend"></span>Trend</span>
+    </div>
+    <p class="trend-caption ${trendClass}">${trendCaption}</p>`;
 }
 
 function populateReportCategoryMonthSelect() {
