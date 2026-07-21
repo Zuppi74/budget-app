@@ -198,6 +198,21 @@ body {
 .summary-card.income .summary-value { color: var(--income); }
 .summary-card.expense .summary-value { color: var(--expense); }
 
+/* Kompakte Variante (Erfassungsseite): nimmt weniger Höhe weg,
+   damit auf dem Handy die Einträge sichtbar bleiben. */
+.summary.compact {
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.summary.compact .summary-card {
+  padding: 10px 12px;
+  gap: 2px;
+}
+
+.summary.compact .summary-label { font-size: 0.7rem; }
+.summary.compact .summary-value { font-size: 1.05rem; }
+
 .content {
   display: grid;
   grid-template-columns: 1.4fr 1fr;
@@ -214,6 +229,7 @@ body {
 @media (max-width: 700px) {
   .content { grid-template-columns: 1fr; }
   .summary { grid-template-columns: 1fr; }
+  .summary.compact { grid-template-columns: repeat(3, 1fr); }
 }
 
 @media (max-width: 600px) {
@@ -239,6 +255,21 @@ body {
   .month-nav { gap: 12px; margin-bottom: 16px; }
 
   .current-month { font-size: 1rem; min-width: 140px; }
+
+  .summary.compact { gap: 6px; }
+
+  .summary.compact .summary-card {
+    padding: 8px 6px;
+    align-items: center;
+    text-align: center;
+  }
+
+  .summary.compact .summary-label {
+    font-size: 0.6rem;
+    letter-spacing: 0;
+  }
+
+  .summary.compact .summary-value { font-size: 0.85rem; }
 
   .view-tabs {
     justify-content: flex-start;
