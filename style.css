@@ -65,6 +65,19 @@ body {
   margin-bottom: 20px;
 }
 
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-logo {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
 .topbar h1 {
   font-size: 1.5rem;
   font-weight: 600;
