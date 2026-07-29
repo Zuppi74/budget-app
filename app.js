@@ -117,20 +117,24 @@ function migrateOldData(old) {
   return ensureAccounts({ categoryGroups, incomeCategories, budgets: {}, entries, recurring: [], depots: [], forecast: { positions: [] }, recentMoves: [] });
 }
 
+/* Ergänzt Felder, die es in älteren Ständen noch nicht gab. Gilt für
+   localStorage genauso wie für importierte Backup-Dateien. */
+function normalizeData(d) {
+  d.budgets = d.budgets || {};
+  d.recentMoves = d.recentMoves || [];
+  d.recurring = d.recurring || [];
+  d.depots = d.depots || [];
+  d.forecast = d.forecast || { positions: [] };
+  d.forecast.positions = d.forecast.positions || [];
+  return ensureAccounts(d);
+}
+
 function loadData() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed.categoryGroups) {
-        parsed.budgets = parsed.budgets || {};
-        parsed.recentMoves = parsed.recentMoves || [];
-        parsed.recurring = parsed.recurring || [];
-        parsed.depots = parsed.depots || [];
-        parsed.forecast = parsed.forecast || { positions: [] };
-        parsed.forecast.positions = parsed.forecast.positions || [];
-        return ensureAccounts(parsed);
-      }
+      if (parsed.categoryGroups) return normalizeData(parsed);
     }
     const oldRaw = localStorage.getItem(OLD_STORAGE_KEY);
     if (oldRaw) {
@@ -1160,12 +1164,66 @@ function findHolding(holdingId) {
   return null;
 }
 
-function getHoldingTotalQuantity(holding) {
+function getHoldingSales(holding) {
+  return holding.sales || [];
+}
+
+/* Courtage verteuert den Kauf und schmälert den Verkaufserlös. Sie wird in
+   der Handelswährung erfasst und mit demselben Kurs umgerechnet. */
+function getPurchaseCostCHF(purchase) {
+  return (purchase.amount + (purchase.fee || 0)) * (purchase.exchangeRate || 1);
+}
+
+function getSaleProceedsCHF(sale) {
+  return (sale.amount - (sale.fee || 0)) * (sale.exchangeRate || 1);
+}
+
+function getHoldingBoughtQuantity(holding) {
   return holding.purchases.reduce((s, p) => s + p.quantity, 0);
 }
 
+function getHoldingSoldQuantity(holding) {
+  return getHoldingSales(holding).reduce((s, x) => s + x.quantity, 0);
+}
+
+function getHoldingTotalQuantity(holding) {
+  return getHoldingBoughtQuantity(holding) - getHoldingSoldQuantity(holding);
+}
+
+/* Durchschnittspreis-Methode: alle Käufe ergeben einen Einstandspreis pro
+   Stück, der sowohl den Restbestand als auch den Gewinn je Verkauf bewertet. */
+function getHoldingAvgCostPerUnitCHF(holding) {
+  const bought = getHoldingBoughtQuantity(holding);
+  if (bought <= 0) return 0;
+  return holding.purchases.reduce((s, p) => s + getPurchaseCostCHF(p), 0) / bought;
+}
+
 function getHoldingCostBasisCHF(holding) {
-  return holding.purchases.reduce((s, p) => s + p.amount * (p.exchangeRate || 1), 0);
+  return getHoldingAvgCostPerUnitCHF(holding) * getHoldingTotalQuantity(holding);
+}
+
+function getSaleGainCHF(holding, sale) {
+  return getSaleProceedsCHF(sale) - getHoldingAvgCostPerUnitCHF(holding) * sale.quantity;
+}
+
+function getHoldingRealizedGainCHF(holding) {
+  return getHoldingSales(holding).reduce((s, x) => s + getSaleGainCHF(holding, x), 0);
+}
+
+function isHoldingClosed(holding) {
+  return getHoldingSoldQuantity(holding) > 0 && getHoldingTotalQuantity(holding) <= 1e-9;
+}
+
+/* Eine ausverkaufte Position hat keinen aktuellen Wert mehr, auch wenn
+   früher einmal einer erfasst wurde. */
+function getHoldingCurrentValue(holding) {
+  return isHoldingClosed(holding) ? 0 : (holding.currentValue || 0);
+}
+
+function formatGainWithPct(gain, base) {
+  const pct = base > 0 ? (gain / base) * 100 : 0;
+  const sign = gain >= 0 ? '+' : '';
+  return `${formatCurrency(gain)} (${sign}${pct.toFixed(1).replace('.', ',')} %)`;
 }
 
 function renderDepotView() {
@@ -1174,7 +1232,7 @@ function renderDepotView() {
   data.depots.forEach(depot => {
     depot.holdings.forEach(h => {
       totalInvested += getHoldingCostBasisCHF(h);
-      totalValue += (h.currentValue || 0);
+      totalValue += getHoldingCurrentValue(h);
     });
   });
   const totalGain = totalValue - totalInvested;
@@ -1238,6 +1296,12 @@ function renderDepotView() {
   container.querySelectorAll('[data-edit-purchase]').forEach(row => {
     row.addEventListener('click', () => openPurchaseModal(row.dataset.holdingId, row.dataset.editPurchase));
   });
+  container.querySelectorAll('[data-add-sale]').forEach(btn => {
+    btn.addEventListener('click', () => openSaleModal(btn.dataset.addSale, null));
+  });
+  container.querySelectorAll('[data-edit-sale]').forEach(row => {
+    row.addEventListener('click', () => openSaleModal(row.dataset.holdingId, row.dataset.editSale));
+  });
 }
 
 function renderDepotHtml(depot) {
@@ -1266,25 +1330,29 @@ function renderDepotHtml(depot) {
 
 function renderHoldingHtml(depot, holding) {
   const qty = getHoldingTotalQuantity(holding);
-  const invested = getHoldingCostBasisCHF(holding);
-  const value = holding.currentValue || 0;
-  const gain = value - invested;
-  const gainPct = invested > 0 ? (gain / invested) * 100 : 0;
-  const gainSign = gain >= 0 ? '+' : '';
+  const closed = isHoldingClosed(holding);
+  const hasSales = getHoldingSales(holding).length > 0;
+  const realized = getHoldingRealizedGainCHF(holding);
+  const soldCostBase = getHoldingAvgCostPerUnitCHF(holding) * getHoldingSoldQuantity(holding);
 
-  const purchasesHtml = holding.purchases.length
-    ? holding.purchases.slice().sort((a, b) => b.date.localeCompare(a.date)).map(p => renderPurchaseRowHtml(holding, p)).join('')
-    : '<p class="empty-hint">Noch keine Käufe erfasst.</p>';
+  const realizedStat = hasSales ? `
+        <div class="holding-stat">
+          <span class="holding-stat-label">Realisiert</span>
+          <span class="holding-stat-value ${realized < 0 ? 'negative' : 'positive'}">${formatGainWithPct(realized, soldCostBase)}</span>
+        </div>` : '';
 
-  return `
-    <div class="holding-card" data-holding-id="${holding.id}">
-      <div class="holding-top">
-        <span class="holding-type-badge">${escapeHtml(holding.type)}</span>
-        <span class="holding-name" data-rename-holding="${holding.id}">${escapeHtml(holding.name)}</span>
-        <button type="button" class="icon-btn small" data-toggle-holding="${holding.id}" aria-label="Käufe anzeigen">${holding.expanded ? '⌄' : '›'}</button>
-        <button type="button" class="icon-btn small" data-delete-holding="${holding.id}" aria-label="Position löschen">✕</button>
-      </div>
-      <div class="holding-stats">
+  let statsHtml;
+  if (closed) {
+    statsHtml = `
+        <div class="holding-stat">
+          <span class="holding-stat-label">Status</span>
+          <span class="holding-stat-value">Verkauft</span>
+        </div>${realizedStat}`;
+  } else {
+    const invested = getHoldingCostBasisCHF(holding);
+    const value = getHoldingCurrentValue(holding);
+    const gain = value - invested;
+    statsHtml = `
         <div class="holding-stat">
           <span class="holding-stat-label">Anzahl</span>
           <span class="holding-stat-value">${formatQuantity(qty)}</span>
@@ -1299,25 +1367,71 @@ function renderHoldingHtml(depot, holding) {
         </div>
         <div class="holding-stat">
           <span class="holding-stat-label">Gewinn/Verlust</span>
-          <span class="holding-stat-value ${gain < 0 ? 'negative' : 'positive'}">${formatCurrency(gain)} (${gainSign}${gainPct.toFixed(1).replace('.', ',')} %)</span>
-        </div>
+          <span class="holding-stat-value ${gain < 0 ? 'negative' : 'positive'}">${formatGainWithPct(gain, invested)}</span>
+        </div>${realizedStat}`;
+  }
+
+  const sellBtn = qty > 1e-9
+    ? `<button type="button" class="btn-secondary" data-add-sale="${holding.id}">− Verkauf</button>`
+    : '';
+
+  return `
+    <div class="holding-card ${closed ? 'closed' : ''}" data-holding-id="${holding.id}">
+      <div class="holding-top">
+        <span class="holding-type-badge">${escapeHtml(holding.type)}</span>
+        <span class="holding-name" data-rename-holding="${holding.id}">${escapeHtml(holding.name)}</span>
+        <button type="button" class="icon-btn small" data-toggle-holding="${holding.id}" aria-label="Transaktionen anzeigen">${holding.expanded ? '⌄' : '›'}</button>
+        <button type="button" class="icon-btn small" data-delete-holding="${holding.id}" aria-label="Position löschen">✕</button>
+      </div>
+      <div class="holding-stats">${statsHtml}
       </div>
       <div class="holding-purchases ${holding.expanded ? '' : 'hidden'}">
-        ${purchasesHtml}
-        <button type="button" class="btn-secondary" data-add-purchase="${holding.id}">+ Kauf</button>
+        ${renderHoldingTransactionsHtml(holding)}
+        <div class="holding-tx-actions">
+          <button type="button" class="btn-secondary" data-add-purchase="${holding.id}">+ Kauf</button>
+          ${sellBtn}
+        </div>
       </div>
     </div>`;
 }
 
+function renderHoldingTransactionsHtml(holding) {
+  const rows = [
+    ...holding.purchases.map(p => ({ date: p.date, html: renderPurchaseRowHtml(holding, p) })),
+    ...getHoldingSales(holding).map(s => ({ date: s.date, html: renderSaleRowHtml(holding, s) }))
+  ];
+  if (rows.length === 0) return '<p class="empty-hint">Noch keine Transaktionen erfasst.</p>';
+  return rows.sort((a, b) => b.date.localeCompare(a.date)).map(r => r.html).join('');
+}
+
+function buildTxMetaHtml(tx) {
+  const dateStr = dateFmt.format(new Date(tx.date + 'T00:00:00'));
+  const rate = tx.exchangeRate || 1;
+  const currencyNote = tx.currency !== 'CHF' ? ` · ${escapeHtml(tx.currency)} @ ${rate}` : '';
+  const feeNote = tx.fee ? ` · Courtage ${formatCurrency(tx.fee * rate)}` : '';
+  return `${dateStr} · ${formatQuantity(tx.quantity)} Stk.${currencyNote}${feeNote}`;
+}
+
 function renderPurchaseRowHtml(holding, purchase) {
-  const chfAmount = purchase.amount * (purchase.exchangeRate || 1);
-  const d = new Date(purchase.date + 'T00:00:00');
-  const dateStr = dateFmt.format(d);
-  const currencyNote = purchase.currency !== 'CHF' ? ` · ${escapeHtml(purchase.currency)} @ ${purchase.exchangeRate}` : '';
   return `
     <div class="purchase-row" data-holding-id="${holding.id}" data-edit-purchase="${purchase.id}">
-      <span class="purchase-row-main">${dateStr} · ${formatQuantity(purchase.quantity)} Stk.${currencyNote}</span>
-      <span class="purchase-row-amount">${formatCurrency(chfAmount)}</span>
+      <span class="tx-badge buy">Kauf</span>
+      <span class="purchase-row-main">${buildTxMetaHtml(purchase)}</span>
+      <span class="purchase-row-amount">${formatCurrency(getPurchaseCostCHF(purchase))}</span>
+    </div>`;
+}
+
+function renderSaleRowHtml(holding, sale) {
+  const gain = getSaleGainCHF(holding, sale);
+  const sign = gain >= 0 ? '+' : '';
+  return `
+    <div class="purchase-row" data-holding-id="${holding.id}" data-edit-sale="${sale.id}">
+      <span class="tx-badge sell">Verkauf</span>
+      <span class="purchase-row-main">${buildTxMetaHtml(sale)}</span>
+      <span class="purchase-row-amount">
+        ${formatCurrency(getSaleProceedsCHF(sale))}
+        <span class="tx-gain ${gain < 0 ? 'negative' : 'positive'}">${sign}${formatCurrency(gain)}</span>
+      </span>
     </div>`;
 }
 
@@ -1354,7 +1468,7 @@ function addHoldingToDepot(depotId, name, type) {
   const depot = findDepot(depotId);
   if (!depot) return;
   mutate(`Position "${name}" zu Depot "${depot.name}" hinzugefügt`, () => {
-    depot.holdings.push({ id: uid(), name, type: type || 'Sonstiges', currentValue: null, expanded: true, purchases: [] });
+    depot.holdings.push({ id: uid(), name, type: type || 'Sonstiges', currentValue: null, expanded: true, purchases: [], sales: [] });
   });
 }
 
@@ -1398,6 +1512,7 @@ function openPurchaseModal(holdingId, purchaseId) {
     document.getElementById('purchase-date').value = purchase.date;
     document.getElementById('purchase-quantity').value = purchase.quantity;
     document.getElementById('purchase-amount').value = purchase.amount;
+    document.getElementById('purchase-fee').value = purchase.fee || 0;
     document.getElementById('purchase-currency').value = purchase.currency;
     document.getElementById('purchase-exchange-rate').value = purchase.exchangeRate;
     deleteBtn.classList.remove('hidden');
@@ -1406,6 +1521,7 @@ function openPurchaseModal(holdingId, purchaseId) {
     document.getElementById('purchase-date').value = new Date().toISOString().slice(0, 10);
     document.getElementById('purchase-quantity').value = '';
     document.getElementById('purchase-amount').value = '';
+    document.getElementById('purchase-fee').value = 0;
     document.getElementById('purchase-currency').value = 'CHF';
     document.getElementById('purchase-exchange-rate').value = 1;
     deleteBtn.classList.add('hidden');
@@ -1425,21 +1541,32 @@ function handlePurchaseSubmit(e) {
   const date = document.getElementById('purchase-date').value;
   const quantity = parseFloat(document.getElementById('purchase-quantity').value);
   const amount = parseFloat(document.getElementById('purchase-amount').value);
+  const fee = parseFloat(document.getElementById('purchase-fee').value) || 0;
   const currency = document.getElementById('purchase-currency').value.trim().toUpperCase() || 'CHF';
   const exchangeRate = parseFloat(document.getElementById('purchase-exchange-rate').value) || 1;
+  const hint = document.getElementById('purchase-quantity-hint');
+  hint.classList.add('hidden');
 
   if (!date || !quantity || quantity <= 0 || !amount || amount <= 0) return;
 
   const holdingName = found.holding.name;
 
   if (purchaseId) {
+    // Beim Verkleinern eines Kaufs darf der Bestand nicht unter die bereits
+    // verkaufte Menge fallen.
+    const existing = found.holding.purchases.find(p => p.id === purchaseId);
+    const minQty = getHoldingSoldQuantity(found.holding) - (getHoldingBoughtQuantity(found.holding) - existing.quantity);
+    if (quantity < minQty - 1e-9) {
+      hint.textContent = `Mindestens ${formatQuantity(minQty)} Stk., da bereits ${formatQuantity(getHoldingSoldQuantity(found.holding))} Stk. verkauft sind.`;
+      hint.classList.remove('hidden');
+      return;
+    }
     mutate(`Kauf bei "${holdingName}" bearbeitet`, () => {
-      const purchase = found.holding.purchases.find(p => p.id === purchaseId);
-      Object.assign(purchase, { date, quantity, amount, currency, exchangeRate });
+      Object.assign(existing, { date, quantity, amount, fee, currency, exchangeRate });
     });
   } else {
     mutate(`Kauf bei "${holdingName}" hinzugefügt (${formatQuantity(quantity)} Stk.)`, () => {
-      found.holding.purchases.push({ id: uid(), date, quantity, amount, currency, exchangeRate });
+      found.holding.purchases.push({ id: uid(), date, quantity, amount, fee, currency, exchangeRate });
     });
   }
 
@@ -1454,10 +1581,146 @@ function deleteCurrentPurchase() {
   const found = findHolding(holdingId);
   if (!found) return;
 
+  const purchase = found.holding.purchases.find(p => p.id === purchaseId);
+  const remainingAfter = getHoldingBoughtQuantity(found.holding) - purchase.quantity - getHoldingSoldQuantity(found.holding);
+  if (remainingAfter < -1e-9) {
+    const hint = document.getElementById('purchase-quantity-hint');
+    hint.textContent = 'Dieser Kauf kann nicht gelöscht werden, weil davon bereits Stück verkauft wurden.';
+    hint.classList.remove('hidden');
+    return;
+  }
+
   mutate(`Kauf bei "${found.holding.name}" gelöscht`, () => {
     found.holding.purchases = found.holding.purchases.filter(p => p.id !== purchaseId);
   });
   closeModal('purchase-modal');
+}
+
+function openSaleModal(holdingId, saleId) {
+  const found = findHolding(holdingId);
+  if (!found) return;
+  const form = document.getElementById('sale-form');
+  form.dataset.holdingId = holdingId;
+  form.dataset.saleId = saleId || '';
+  const deleteBtn = document.getElementById('btn-delete-sale');
+  const existing = saleId ? getHoldingSales(found.holding).find(s => s.id === saleId) : null;
+
+  if (saleId && !existing) return;
+
+  if (existing) {
+    document.getElementById('sale-modal-title').textContent = 'Verkauf bearbeiten';
+    document.getElementById('sale-date').value = existing.date;
+    document.getElementById('sale-quantity').value = existing.quantity;
+    document.getElementById('sale-amount').value = existing.amount;
+    document.getElementById('sale-fee').value = existing.fee || 0;
+    document.getElementById('sale-currency').value = existing.currency;
+    document.getElementById('sale-exchange-rate').value = existing.exchangeRate;
+    deleteBtn.classList.remove('hidden');
+  } else {
+    document.getElementById('sale-modal-title').textContent = 'Verkauf erfassen';
+    document.getElementById('sale-date').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('sale-quantity').value = '';
+    document.getElementById('sale-amount').value = '';
+    document.getElementById('sale-fee').value = 0;
+    document.getElementById('sale-currency').value = 'CHF';
+    document.getElementById('sale-exchange-rate').value = 1;
+    deleteBtn.classList.add('hidden');
+  }
+
+  const hint = document.getElementById('sale-quantity-hint');
+  hint.classList.remove('error');
+  hint.textContent = `Verfügbar: ${formatQuantity(getSellableQuantity(found.holding, existing))} Stk.`;
+  updateSalePreview();
+  openModal('sale-modal');
+}
+
+/* Beim Bearbeiten zählt die eigene Menge wieder zum verfügbaren Bestand. */
+function getSellableQuantity(holding, existingSale) {
+  return getHoldingTotalQuantity(holding) + (existingSale ? existingSale.quantity : 0);
+}
+
+function updateSalePreview() {
+  const form = document.getElementById('sale-form');
+  const el = document.getElementById('sale-preview');
+  const found = findHolding(form.dataset.holdingId);
+  if (!found) { el.textContent = ''; return; }
+
+  const quantity = parseFloat(document.getElementById('sale-quantity').value);
+  const amount = parseFloat(document.getElementById('sale-amount').value);
+  const fee = parseFloat(document.getElementById('sale-fee').value) || 0;
+  const exchangeRate = parseFloat(document.getElementById('sale-exchange-rate').value) || 1;
+
+  if (!quantity || quantity <= 0 || isNaN(amount)) {
+    el.textContent = '';
+    el.className = 'sale-preview';
+    return;
+  }
+
+  const proceeds = (amount - fee) * exchangeRate;
+  const cost = getHoldingAvgCostPerUnitCHF(found.holding) * quantity;
+  const gain = proceeds - cost;
+  const sign = gain >= 0 ? '+' : '';
+  el.innerHTML = `Erlös netto ${formatCurrency(proceeds)} − Einstand ${formatCurrency(cost)} =
+    <strong>${sign}${formatCurrency(gain)}</strong>`;
+  el.className = `sale-preview ${gain < 0 ? 'negative' : 'positive'}`;
+}
+
+function handleSaleSubmit(e) {
+  e.preventDefault();
+  const form = document.getElementById('sale-form');
+  const holdingId = form.dataset.holdingId;
+  const saleId = form.dataset.saleId;
+  const found = findHolding(holdingId);
+  if (!found) return;
+
+  const date = document.getElementById('sale-date').value;
+  const quantity = parseFloat(document.getElementById('sale-quantity').value);
+  const amount = parseFloat(document.getElementById('sale-amount').value);
+  const fee = parseFloat(document.getElementById('sale-fee').value) || 0;
+  const currency = document.getElementById('sale-currency').value.trim().toUpperCase() || 'CHF';
+  const exchangeRate = parseFloat(document.getElementById('sale-exchange-rate').value) || 1;
+
+  if (!date || !quantity || quantity <= 0 || isNaN(amount) || amount < 0) return;
+
+  const existing = saleId ? getHoldingSales(found.holding).find(s => s.id === saleId) : null;
+  const available = getSellableQuantity(found.holding, existing);
+  const hint = document.getElementById('sale-quantity-hint');
+
+  if (quantity > available + 1e-9) {
+    hint.textContent = `Es sind nur ${formatQuantity(available)} Stk. verfügbar.`;
+    hint.classList.add('error');
+    return;
+  }
+
+  const holdingName = found.holding.name;
+
+  if (existing) {
+    mutate(`Verkauf bei "${holdingName}" bearbeitet`, () => {
+      Object.assign(existing, { date, quantity, amount, fee, currency, exchangeRate });
+    });
+  } else {
+    const gain = (amount - fee) * exchangeRate - getHoldingAvgCostPerUnitCHF(found.holding) * quantity;
+    mutate(`Verkauf bei "${holdingName}" (${formatQuantity(quantity)} Stk., ${gain >= 0 ? '+' : ''}${formatCurrency(gain)})`, () => {
+      found.holding.sales = found.holding.sales || [];
+      found.holding.sales.push({ id: uid(), date, quantity, amount, fee, currency, exchangeRate });
+    });
+  }
+
+  closeModal('sale-modal');
+}
+
+function deleteCurrentSale() {
+  const form = document.getElementById('sale-form');
+  const holdingId = form.dataset.holdingId;
+  const saleId = form.dataset.saleId;
+  if (!saleId) return;
+  const found = findHolding(holdingId);
+  if (!found) return;
+
+  mutate(`Verkauf bei "${found.holding.name}" gelöscht`, () => {
+    found.holding.sales = getHoldingSales(found.holding).filter(s => s.id !== saleId);
+  });
+  closeModal('sale-modal');
 }
 
 function openCurrentValueModal(holdingId) {
@@ -2244,9 +2507,7 @@ function handleImportFile(e) {
     }
     if (!confirm('Der Import ersetzt alle aktuellen Daten in dieser App durch den Inhalt der Datei. Fortfahren?')) return;
 
-    imported.budgets = imported.budgets || {};
-    imported.recentMoves = imported.recentMoves || [];
-    ensureAccounts(imported);
+    normalizeData(imported);
 
     mutate('Daten importiert', () => {
       data = imported;
@@ -2343,6 +2604,12 @@ function init() {
   document.getElementById('purchase-form').addEventListener('submit', handlePurchaseSubmit);
   document.getElementById('btn-delete-purchase').addEventListener('click', deleteCurrentPurchase);
   document.getElementById('current-value-form').addEventListener('submit', handleCurrentValueSubmit);
+
+  document.getElementById('sale-form').addEventListener('submit', handleSaleSubmit);
+  document.getElementById('btn-delete-sale').addEventListener('click', deleteCurrentSale);
+  ['sale-quantity', 'sale-amount', 'sale-fee', 'sale-exchange-rate'].forEach(id => {
+    document.getElementById(id).addEventListener('input', updateSalePreview);
+  });
 
   document.getElementById('btn-add-forecast-expense').addEventListener('click', () => openForecastPositionModal('expense', null));
   document.getElementById('btn-add-forecast-income').addEventListener('click', () => openForecastPositionModal('income', null));

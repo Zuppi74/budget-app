@@ -702,6 +702,7 @@ body {
 #entry-form,
 #transfer-form,
 #purchase-form,
+#sale-form,
 #current-value-form,
 #forecast-form {
   display: flex;
@@ -712,6 +713,7 @@ body {
 #entry-form label,
 #transfer-form label,
 #purchase-form label,
+#sale-form label,
 #current-value-form label,
 #forecast-form label {
   font-size: 0.82rem;
@@ -724,6 +726,7 @@ body {
 #transfer-form input,
 #transfer-form select,
 #purchase-form input,
+#sale-form input,
 #current-value-form input,
 #forecast-form > input {
   padding: 9px 10px;
@@ -1644,8 +1647,62 @@ body {
 
 .purchase-row:hover { background: var(--bg); }
 
-.purchase-row-main { color: var(--text-muted); }
-.purchase-row-amount { font-weight: 600; white-space: nowrap; }
+.purchase-row-main { color: var(--text-muted); flex: 1; min-width: 0; }
+
+.purchase-row-amount {
+  font-weight: 600;
+  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+.tx-badge {
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.tx-badge.buy { background: rgba(61, 122, 92, 0.12); color: var(--income); }
+.tx-badge.sell { background: rgba(181, 83, 60, 0.12); color: var(--expense); }
+
+.tx-gain { font-size: 0.76rem; font-weight: 600; }
+.tx-gain.positive { color: var(--income); }
+.tx-gain.negative { color: var(--expense); }
+
+.holding-card.closed { opacity: 0.75; }
+
+.holding-tx-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.field-hint {
+  margin: 2px 0 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.field-hint.error { color: var(--danger); }
+
+.sale-preview {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.sale-preview:empty { display: none; }
+.sale-preview.positive strong { color: var(--income); }
+.sale-preview.negative strong { color: var(--expense); }
 
 /* ---------- Ausgaben-Trend (Auswertung) ---------- */
 

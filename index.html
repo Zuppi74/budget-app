@@ -393,9 +393,14 @@
 
       <label for="purchase-quantity">Anzahl</label>
       <input type="number" id="purchase-quantity" step="any" min="0" required>
+      <p id="purchase-quantity-hint" class="field-hint error hidden"></p>
 
       <label for="purchase-amount">Betrag</label>
       <input type="number" id="purchase-amount" step="0.01" min="0" required>
+
+      <label for="purchase-fee">Courtage</label>
+      <input type="number" id="purchase-fee" step="0.01" min="0" value="0">
+      <p class="field-hint">In der gleichen Währung wie der Betrag. Erhöht den Einstandspreis.</p>
 
       <label for="purchase-currency">Währung</label>
       <input type="text" id="purchase-currency" list="currency-options" value="CHF" required>
@@ -405,6 +410,43 @@
 
       <div class="modal-actions">
         <button type="button" id="btn-delete-purchase" class="btn-danger hidden">Löschen</button>
+        <button type="submit" class="btn-primary">Speichern</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="sale-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="sale-modal-title">Verkauf erfassen</h3>
+      <button class="icon-btn modal-close" data-close="sale-modal" aria-label="Schließen">✕</button>
+    </div>
+    <form id="sale-form">
+      <label for="sale-date">Verkaufsdatum</label>
+      <input type="date" id="sale-date" required>
+
+      <label for="sale-quantity">Anzahl</label>
+      <input type="number" id="sale-quantity" step="any" min="0" required>
+      <p id="sale-quantity-hint" class="field-hint"></p>
+
+      <label for="sale-amount">Erlös (brutto)</label>
+      <input type="number" id="sale-amount" step="0.01" min="0" required>
+
+      <label for="sale-fee">Courtage</label>
+      <input type="number" id="sale-fee" step="0.01" min="0" value="0">
+      <p class="field-hint">In der gleichen Währung wie der Erlös. Wird vom Erlös abgezogen.</p>
+
+      <label for="sale-currency">Währung</label>
+      <input type="text" id="sale-currency" list="currency-options" value="CHF" required>
+
+      <label for="sale-exchange-rate">Wechselkurs (1 Einheit Währung = X CHF)</label>
+      <input type="number" id="sale-exchange-rate" step="0.0001" min="0" value="1" required>
+
+      <p id="sale-preview" class="sale-preview"></p>
+
+      <div class="modal-actions">
+        <button type="button" id="btn-delete-sale" class="btn-danger hidden">Löschen</button>
         <button type="submit" class="btn-primary">Speichern</button>
       </div>
     </form>
