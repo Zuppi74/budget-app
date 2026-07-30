@@ -1051,8 +1051,11 @@ function renderAccountsView() {
     <div class="account-row" data-account-id="${a.id}">
       <div class="account-info">
         <span class="account-name" data-rename-account="${a.id}">${escapeHtml(a.name)}</span>
-        <span class="account-type-badge" data-edit-type="${a.id}">${escapeHtml(a.type || 'Kein Typ')}</span>
-        <span class="account-start-balance" data-edit-balance="${a.id}" title="Startguthaben bearbeiten">Start: ${formatCurrency(a.balance)}</span>
+        <div class="account-meta">
+          <span class="account-type-badge" data-edit-type="${a.id}">${escapeHtml(a.type || 'Kein Typ')}</span>
+          <span class="account-meta-sep">·</span>
+          <span class="account-start-balance" data-edit-balance="${a.id}" title="Startguthaben bearbeiten">Start: ${formatCurrency(a.balance)}</span>
+        </div>
       </div>
       <span class="account-balance ${current < 0 ? 'negative' : ''}">${formatCurrency(current)}</span>
       <button type="button" class="icon-btn small" data-delete-account="${a.id}" aria-label="Konto löschen" ${data.accounts.length === 1 ? 'disabled' : ''}>✕</button>

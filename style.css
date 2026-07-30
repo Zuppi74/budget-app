@@ -1243,7 +1243,7 @@ body {
 .accounts-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .account-row {
@@ -1251,7 +1251,7 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  padding: 14px 16px;
+  padding: 10px 14px;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1261,8 +1261,22 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   min-width: 0;
+}
+
+/* Typ und Startguthaben stehen in einer Zeile statt gestapelt, damit
+   eine Kontokarte weniger Höhe braucht. */
+.account-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+}
+
+.account-meta-sep {
+  font-size: 0.76rem;
+  color: var(--text-muted);
 }
 
 .account-name {
