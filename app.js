@@ -1780,6 +1780,29 @@ function getForecastPositionYearTotal(p) {
   return p.amount * (p.months ? p.months.length : 0);
 }
 
+function getForecastCategoryLabel(type, categoryValue) {
+  return type === 'expense' ? getCategoryDisplayName(categoryValue) : categoryValue;
+}
+
+/* Positionen aus der Zeit vor der Kategorie-Auswahl haben noch eine freie
+   "name"-Bezeichnung statt einer echten Kategorie-Referenz. */
+function getForecastPositionLabel(p) {
+  if (p.category) return getForecastCategoryLabel(p.type, p.category);
+  return p.name || '';
+}
+
+function populateForecastCategorySelect(type, legacyLabel) {
+  populateCategorySelect(type, 'forecast-category');
+  if (legacyLabel) {
+    const select = document.getElementById('forecast-category');
+    const opt = document.createElement('option');
+    opt.value = '__legacy__';
+    opt.textContent = `${legacyLabel} (bisher, bitte Kategorie wählen)`;
+    select.insertBefore(opt, select.firstChild);
+    select.value = '__legacy__';
+  }
+}
+
 function formatMonthsList(months) {
   if (!months || months.length === 0) return '—';
   const sorted = months.slice().sort((a, b) => a - b);
@@ -1855,7 +1878,7 @@ function renderForecastPositionRow(p) {
   return `
     <div class="forecast-item" data-edit-forecast="${p.id}">
       <div class="forecast-item-info">
-        <span class="forecast-item-name">${escapeHtml(p.name)}</span>
+        <span class="forecast-item-name">${escapeHtml(getForecastPositionLabel(p))}</span>
         <span class="forecast-item-meta">${escapeHtml(formatMonthsList(p.months))} · ${perMonth}</span>
       </div>
       <span class="forecast-item-total ${p.type}">${formatCurrency(yearTotal)}</span>
@@ -1867,6 +1890,14 @@ function setForecastType(type) {
   document.querySelectorAll('.forecast-type-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.forecastType === type);
   });
+}
+
+/* Beim manuellen Umschalten im Dialog (nicht beim ersten Öffnen) passt sich
+   die Kategorieliste dem neuen Typ an - eine evtl. gezeigte Alt-Bezeichnung
+   verliert dabei ihre Gültigkeit. */
+function switchForecastType(type) {
+  setForecastType(type);
+  populateForecastCategorySelect(type);
 }
 
 function renderForecastMonthGrid(selected) {
@@ -1897,15 +1928,15 @@ function openForecastPositionModal(type, positionId) {
   const deleteBtn = document.getElementById('btn-delete-forecast');
   let selectedMonths = [];
   let posType = type || 'expense';
+  let pos = null;
 
   if (positionId) {
-    const pos = ensureForecast().positions.find(p => p.id === positionId);
+    pos = ensureForecast().positions.find(p => p.id === positionId);
     if (!pos) return;
     posType = pos.type;
     selectedMonths = (pos.months || []).slice();
     document.getElementById('forecast-modal-title').textContent = 'Position bearbeiten';
     document.getElementById('forecast-id').value = pos.id;
-    document.getElementById('forecast-name').value = pos.name;
     document.getElementById('forecast-amount').value = pos.amount;
     deleteBtn.classList.remove('hidden');
   } else {
@@ -1915,6 +1946,8 @@ function openForecastPositionModal(type, positionId) {
   }
 
   setForecastType(posType);
+  populateForecastCategorySelect(posType, pos && !pos.category ? pos.name : null);
+  if (pos && pos.category) document.getElementById('forecast-category').value = pos.category;
   renderForecastMonthGrid(selectedMonths);
   openModal('forecast-modal');
 }
@@ -1922,28 +1955,41 @@ function openForecastPositionModal(type, positionId) {
 function handleForecastFormSubmit(e) {
   e.preventDefault();
   const id = document.getElementById('forecast-id').value;
-  const name = document.getElementById('forecast-name').value.trim();
+  const categoryValue = document.getElementById('forecast-category').value;
   const amount = parseFloat(document.getElementById('forecast-amount').value);
   const type = document.querySelector('.forecast-type-btn.active').dataset.forecastType;
   const months = Array.from(document.querySelectorAll('#forecast-month-grid .forecast-month-btn.active'))
     .map(btn => parseInt(btn.dataset.month, 10))
     .sort((a, b) => a - b);
 
-  if (!name || isNaN(amount) || amount <= 0) return;
+  if (!categoryValue || isNaN(amount) || amount <= 0) return;
   if (months.length === 0) {
     document.getElementById('forecast-month-hint').classList.remove('hidden');
     return;
   }
 
+  // "__legacy__" heisst: die alte Bezeichnung wurde unverändert übernommen,
+  // ohne dass eine echte Kategorie zugewiesen wurde.
+  const keepLegacy = categoryValue === '__legacy__';
   ensureForecast();
+
   if (id) {
-    mutate(`Forecast-Position "${name}" bearbeitet`, () => {
-      const pos = data.forecast.positions.find(p => p.id === id);
-      if (pos) Object.assign(pos, { type, name, amount, months });
+    const pos = data.forecast.positions.find(p => p.id === id);
+    if (!pos) return;
+    const label = keepLegacy ? getForecastPositionLabel(pos) : getForecastCategoryLabel(type, categoryValue);
+    mutate(`Forecast-Position "${label}" bearbeitet`, () => {
+      pos.type = type;
+      pos.amount = amount;
+      pos.months = months;
+      if (!keepLegacy) {
+        pos.category = categoryValue;
+        delete pos.name;
+      }
     });
   } else {
-    mutate(`Forecast-Position "${name}" hinzugefügt`, () => {
-      data.forecast.positions.push({ id: uid(), type, name, amount, months });
+    const label = getForecastCategoryLabel(type, categoryValue);
+    mutate(`Forecast-Position "${label}" hinzugefügt`, () => {
+      data.forecast.positions.push({ id: uid(), type, category: categoryValue, amount, months });
     });
   }
   closeModal('forecast-modal');
@@ -1952,7 +1998,8 @@ function handleForecastFormSubmit(e) {
 function deleteForecastPosition(id) {
   const pos = ensureForecast().positions.find(p => p.id === id);
   if (!pos) return;
-  mutate(`Forecast-Position "${pos.name}" gelöscht`, () => {
+  const label = getForecastPositionLabel(pos);
+  mutate(`Forecast-Position "${label}" gelöscht`, () => {
     data.forecast.positions = data.forecast.positions.filter(p => p.id !== id);
   });
 }
@@ -2199,8 +2246,8 @@ function setView(view) {
   if (view === 'capture') { populateEntryFilters(); renderEntries(getFilteredEntries(getEntriesForCurrentMonth())); }
 }
 
-function populateCategorySelect(type) {
-  const select = document.getElementById('entry-category');
+function populateCategorySelect(type, selectId) {
+  const select = document.getElementById(selectId || 'entry-category');
   if (type === 'expense') {
     select.innerHTML = data.categoryGroups.map(group => {
       const options = group.categories.map(c => `<option value="${c.id}">${c.icon ? c.icon + ' ' : ''}${escapeHtml(c.name)}</option>`).join('');
@@ -2619,7 +2666,7 @@ function init() {
   document.getElementById('forecast-form').addEventListener('submit', handleForecastFormSubmit);
   document.getElementById('btn-delete-forecast').addEventListener('click', deleteCurrentForecastPosition);
   document.querySelectorAll('.forecast-type-btn').forEach(btn => {
-    btn.addEventListener('click', () => setForecastType(btn.dataset.forecastType));
+    btn.addEventListener('click', () => switchForecastType(btn.dataset.forecastType));
   });
   document.querySelectorAll('[data-forecast-preset]').forEach(btn => {
     btn.addEventListener('click', () => applyForecastPreset(btn.dataset.forecastPreset));

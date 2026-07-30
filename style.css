@@ -728,7 +728,8 @@ body {
 #purchase-form input,
 #sale-form input,
 #current-value-form input,
-#forecast-form > input {
+#forecast-form > input,
+#forecast-form > select {
   padding: 9px 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
