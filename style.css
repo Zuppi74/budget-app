@@ -1519,20 +1519,19 @@ body {
 .depot-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-left: 3px solid var(--accent);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   overflow: hidden;
 }
 
-/* Akzentuierte Kopfzeile, damit ein Depot klar als eigener Block lesbar
-   ist und sich nicht mit dem Seitenhintergrund vermischt. */
+/* Etwas dunkler als der Seitenhintergrund statt eingefärbt, damit ein Depot
+   klar als eigener Block lesbar ist, ohne farblich hervorzustechen. */
 .depot-header {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 6px 14px;
-  background: rgba(61, 122, 92, 0.09);
+  background: #ddd9d1;
   border-bottom: 1px solid var(--border);
 }
 
@@ -1541,7 +1540,7 @@ body {
   min-width: 0;
   font-weight: 700;
   font-size: 0.95rem;
-  color: var(--accent);
+  color: var(--text);
   cursor: text;
   padding: 2px 6px;
   border-radius: 4px;
