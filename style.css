@@ -311,6 +311,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
   margin-bottom: 12px;
 }
 
@@ -323,6 +325,7 @@ body {
 .panel-header-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -470,6 +473,7 @@ body {
 
 .entry-amount.income { color: var(--income); }
 .entry-amount.expense { color: var(--expense); }
+.entry-amount.transfer { color: var(--text-muted); }
 
 .empty-hint {
   color: var(--text-muted);
@@ -705,7 +709,8 @@ body {
 #sale-form,
 #current-value-form,
 #forecast-form,
-#end-recurring-form {
+#end-recurring-form,
+#account-transfer-form {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -717,7 +722,8 @@ body {
 #sale-form label,
 #current-value-form label,
 #forecast-form label,
-#end-recurring-form label {
+#end-recurring-form label,
+#account-transfer-form label {
   font-size: 0.82rem;
   color: var(--text-muted);
   margin-top: 10px;
@@ -732,7 +738,9 @@ body {
 #current-value-form input,
 #forecast-form > input,
 #forecast-form > select,
-#end-recurring-form input {
+#end-recurring-form input,
+#account-transfer-form input,
+#account-transfer-form select {
   padding: 9px 10px;
   border: 1px solid var(--border);
   border-radius: 8px;

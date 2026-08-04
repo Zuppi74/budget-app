@@ -109,6 +109,7 @@
         <h2>Einträge</h2>
         <div class="panel-header-actions">
           <button id="btn-recurring" class="btn-secondary">Wiederkehrend</button>
+          <button id="btn-account-transfer" class="btn-secondary">⇄ Überweisung</button>
           <button id="btn-add-entry" class="btn-primary">+ Eintrag</button>
         </div>
       </div>
@@ -395,6 +396,37 @@
 
       <div class="modal-actions">
         <button type="submit" class="btn-primary">Umlagern</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="account-transfer-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="account-transfer-modal-title">Konto zu Konto überweisen</h3>
+      <button class="icon-btn modal-close" data-close="account-transfer-modal" aria-label="Schließen">✕</button>
+    </div>
+    <form id="account-transfer-form">
+      <label for="account-transfer-from">Von Konto</label>
+      <select id="account-transfer-from" required></select>
+
+      <label for="account-transfer-to">Nach Konto</label>
+      <select id="account-transfer-to" required></select>
+      <p id="account-transfer-error" class="transfer-error"></p>
+
+      <label for="account-transfer-amount">Betrag (CHF)</label>
+      <input type="number" id="account-transfer-amount" step="0.01" min="0.01" required>
+
+      <label for="account-transfer-date">Datum</label>
+      <input type="date" id="account-transfer-date" required>
+
+      <label for="account-transfer-note">Notiz</label>
+      <input type="text" id="account-transfer-note" placeholder="Optional">
+
+      <div class="modal-actions">
+        <button type="button" id="btn-delete-account-transfer" class="btn-danger hidden">Löschen</button>
+        <button type="submit" class="btn-primary">Überweisen</button>
       </div>
     </form>
   </div>

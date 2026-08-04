@@ -246,6 +246,9 @@ function getCategoryDisplayName(categoryId) {
 }
 
 function getEntryCategoryLabel(entry) {
+  if (entry.type === 'transfer') {
+    return `${getAccountName(entry.fromAccount)} → ${getAccountName(entry.toAccount)}`;
+  }
   return entry.type === 'expense' ? getCategoryName(entry.category) : entry.category;
 }
 
@@ -261,9 +264,15 @@ function getAccountName(accountId) {
 function getAccountCurrentBalance(accountId) {
   const account = findAccount(accountId);
   if (!account) return 0;
-  const delta = data.entries
-    .filter(e => e.account === accountId)
-    .reduce((s, e) => s + (e.type === 'income' ? e.amount : -e.amount), 0);
+  const delta = data.entries.reduce((s, e) => {
+    if (e.type === 'transfer') {
+      if (e.fromAccount === accountId) return s - e.amount;
+      if (e.toAccount === accountId) return s + e.amount;
+      return s;
+    }
+    if (e.account !== accountId) return s;
+    return s + (e.type === 'income' ? e.amount : -e.amount);
+  }, 0);
   return account.balance + delta;
 }
 
@@ -395,7 +404,12 @@ function getFilteredEntries(monthEntries) {
       if (f.dateFrom && e.date < f.dateFrom) return false;
       if (f.dateTo && e.date > f.dateTo) return false;
       if (f.category !== 'all' && e.category !== f.category) return false;
-      if (f.account !== 'all' && e.account !== f.account) return false;
+      if (f.account !== 'all') {
+        const matchesAccount = e.type === 'transfer'
+          ? (e.fromAccount === f.account || e.toAccount === f.account)
+          : e.account === f.account;
+        if (!matchesAccount) return false;
+      }
       if (f.label !== 'all' && (e.label || '') !== f.label) return false;
       return true;
     })
@@ -462,13 +476,13 @@ function renderEntries(entries) {
     const accountName = e.account ? getAccountName(e.account) : null;
     const metaParts = [dateStr, accountName, e.note].filter(Boolean).map(escapeHtml);
     const meta = metaParts.join(' · ');
-    const sign = e.type === 'income' ? '+' : '−';
+    const sign = e.type === 'income' ? '+' : e.type === 'transfer' ? '⇄' : '−';
     const labelTag = e.label ? `<span class="entry-label-tag">${escapeHtml(e.label)}</span>` : '';
     const recurringBadge = e.recurringId ? `<span class="entry-recurring-badge" title="Wiederkehrende Buchung">↻</span>` : '';
-    const icon = e.type === 'expense' ? getCategoryIcon(e.category) : '';
+    const icon = e.type === 'expense' ? getCategoryIcon(e.category) : e.type === 'transfer' ? '🔁' : '';
     const iconEl = icon ? `<span class="entry-icon">${icon}</span>` : '';
     return `
-      <div class="entry-row" data-id="${e.id}">
+      <div class="entry-row" data-id="${e.id}" data-type="${e.type}">
         ${iconEl}
         <div class="entry-main">
           <span class="entry-category-row">
@@ -483,7 +497,10 @@ function renderEntries(entries) {
   }).join('');
 
   container.querySelectorAll('.entry-row').forEach(row => {
-    row.addEventListener('click', () => openEntryModal(row.dataset.id));
+    row.addEventListener('click', () => {
+      if (row.dataset.type === 'transfer') openAccountTransferModal(row.dataset.id);
+      else openEntryModal(row.dataset.id);
+    });
   });
 }
 
@@ -1148,6 +1165,97 @@ function deleteAccount(accountId) {
   mutate(`Konto "${account.name}" gelöscht`, () => {
     data.accounts = data.accounts.filter(a => a.id !== accountId);
   });
+}
+
+/* ---------- Konto-zu-Konto-Überweisung ---------- */
+
+function openAccountTransferModal(entryId) {
+  if (data.accounts.length < 2) {
+    alert('Für eine Überweisung werden mindestens zwei Konten benötigt.');
+    return;
+  }
+
+  const form = document.getElementById('account-transfer-form');
+  form.reset();
+  form.dataset.entryId = entryId || '';
+  document.getElementById('account-transfer-error').textContent = '';
+  const deleteBtn = document.getElementById('btn-delete-account-transfer');
+
+  populateAccountSelect('account-transfer-from');
+  populateAccountSelect('account-transfer-to');
+
+  if (entryId) {
+    const entry = data.entries.find(e => e.id === entryId && e.type === 'transfer');
+    if (!entry) return;
+    document.getElementById('account-transfer-modal-title').textContent = 'Überweisung bearbeiten';
+    document.getElementById('account-transfer-from').value = entry.fromAccount;
+    document.getElementById('account-transfer-to').value = entry.toAccount;
+    document.getElementById('account-transfer-amount').value = entry.amount;
+    document.getElementById('account-transfer-date').value = entry.date;
+    document.getElementById('account-transfer-note').value = entry.note || '';
+    deleteBtn.classList.remove('hidden');
+  } else {
+    document.getElementById('account-transfer-modal-title').textContent = 'Konto zu Konto überweisen';
+    document.getElementById('account-transfer-from').value = data.accounts[0].id;
+    document.getElementById('account-transfer-to').value = data.accounts[1].id;
+    document.getElementById('account-transfer-date').value = new Date().toISOString().slice(0, 10);
+    deleteBtn.classList.add('hidden');
+  }
+
+  openModal('account-transfer-modal');
+}
+
+function validateAccountTransferSelection() {
+  const from = document.getElementById('account-transfer-from').value;
+  const to = document.getElementById('account-transfer-to').value;
+  const errorEl = document.getElementById('account-transfer-error');
+  const sameAccount = from && to && from === to;
+  errorEl.textContent = sameAccount ? 'Von- und Nach-Konto müssen unterschiedlich sein.' : '';
+  return !sameAccount;
+}
+
+function handleAccountTransferSubmit(e) {
+  e.preventDefault();
+  if (!validateAccountTransferSelection()) return;
+
+  const form = document.getElementById('account-transfer-form');
+  const entryId = form.dataset.entryId;
+  const fromAccount = document.getElementById('account-transfer-from').value;
+  const toAccount = document.getElementById('account-transfer-to').value;
+  const amount = parseFloat(document.getElementById('account-transfer-amount').value);
+  const date = document.getElementById('account-transfer-date').value;
+  const note = document.getElementById('account-transfer-note').value.trim();
+
+  if (!amount || amount <= 0 || !date) return;
+
+  const fromName = getAccountName(fromAccount);
+  const toName = getAccountName(toAccount);
+
+  if (entryId) {
+    mutate(`Überweisung "${fromName} → ${toName}" bearbeitet`, () => {
+      const entry = data.entries.find(x => x.id === entryId);
+      if (entry) Object.assign(entry, { fromAccount, toAccount, amount, date, note });
+    });
+  } else {
+    mutate(`${formatCurrency(amount)} von "${fromName}" nach "${toName}" überwiesen`, () => {
+      data.entries.push({ id: uid(), type: 'transfer', fromAccount, toAccount, amount, date, note });
+    });
+  }
+
+  closeModal('account-transfer-modal');
+}
+
+function deleteCurrentAccountTransfer() {
+  const form = document.getElementById('account-transfer-form');
+  const entryId = form.dataset.entryId;
+  if (!entryId) return;
+  const entry = data.entries.find(e => e.id === entryId);
+  if (!entry) return;
+
+  mutate(`Überweisung "${getEntryCategoryLabel(entry)}" gelöscht (${formatCurrency(entry.amount)})`, () => {
+    data.entries = data.entries.filter(e => e.id !== entryId);
+  });
+  closeModal('account-transfer-modal');
 }
 
 function addNewAccount() {
@@ -2271,8 +2379,8 @@ function populateCategorySelect(type, selectId) {
   }
 }
 
-function populateAccountSelect() {
-  const select = document.getElementById('entry-account');
+function populateAccountSelect(selectId) {
+  const select = document.getElementById(selectId || 'entry-account');
   select.innerHTML = data.accounts.map(a => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('');
 }
 
@@ -2548,10 +2656,10 @@ function exportEntriesAsCsv() {
     .slice()
     .sort((a, b) => a.date.localeCompare(b.date))
     .map(e => {
-      const typeLabel = e.type === 'income' ? 'Einnahme' : 'Ausgabe';
+      const typeLabel = e.type === 'income' ? 'Einnahme' : e.type === 'transfer' ? 'Transfer' : 'Ausgabe';
       const categoryLabel = getEntryCategoryLabel(e);
       const accountLabel = e.account ? getAccountName(e.account) : '';
-      const signedAmount = e.type === 'income' ? e.amount : -e.amount;
+      const signedAmount = e.type === 'expense' ? -e.amount : e.amount;
       const amountStr = signedAmount.toFixed(2).replace('.', ',');
       return [e.date, typeLabel, categoryLabel, accountLabel, e.label || '', e.note || '', amountStr];
     });
@@ -2663,6 +2771,12 @@ function init() {
     openModal('recurring-modal');
   });
   document.getElementById('end-recurring-form').addEventListener('submit', handleEndRecurringSubmit);
+
+  document.getElementById('btn-account-transfer').addEventListener('click', () => openAccountTransferModal(null));
+  document.getElementById('account-transfer-form').addEventListener('submit', handleAccountTransferSubmit);
+  document.getElementById('btn-delete-account-transfer').addEventListener('click', deleteCurrentAccountTransfer);
+  document.getElementById('account-transfer-from').addEventListener('change', validateAccountTransferSelection);
+  document.getElementById('account-transfer-to').addEventListener('change', validateAccountTransferSelection);
 
   document.getElementById('btn-clear-icon').addEventListener('click', () => {
     if (iconPickerTargetId) setCategoryIcon(iconPickerTargetId, '');
