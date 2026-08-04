@@ -359,6 +359,25 @@
   </div>
 </div>
 
+<div id="end-recurring-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Wiederkehrende Buchung löschen</h3>
+      <button class="icon-btn modal-close" data-close="end-recurring-modal" aria-label="Schließen">✕</button>
+    </div>
+    <p id="end-recurring-info" class="recurring-hint"></p>
+    <form id="end-recurring-form">
+      <label for="end-recurring-date">Löschen ab</label>
+      <input type="date" id="end-recurring-date" required>
+      <p class="field-hint">Buchungen vor diesem Datum bleiben in der Erfassung erhalten. Ab diesem Datum werden bestehende Buchungen entfernt und es werden keine neuen mehr erzeugt.</p>
+
+      <div class="modal-actions">
+        <button type="submit" class="btn-danger">Löschen</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <div id="transfer-modal" class="modal-overlay hidden">
   <div class="modal">
     <div class="modal-header">

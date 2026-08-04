@@ -704,7 +704,8 @@ body {
 #purchase-form,
 #sale-form,
 #current-value-form,
-#forecast-form {
+#forecast-form,
+#end-recurring-form {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -715,7 +716,8 @@ body {
 #purchase-form label,
 #sale-form label,
 #current-value-form label,
-#forecast-form label {
+#forecast-form label,
+#end-recurring-form label {
   font-size: 0.82rem;
   color: var(--text-muted);
   margin-top: 10px;
@@ -729,7 +731,8 @@ body {
 #sale-form input,
 #current-value-form input,
 #forecast-form > input,
-#forecast-form > select {
+#forecast-form > select,
+#end-recurring-form input {
   padding: 9px 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -812,6 +815,7 @@ body {
 }
 
 .modal-actions .btn-primary { margin-left: auto; }
+#end-recurring-modal .modal-actions { justify-content: flex-end; }
 
 .settings-body {
   display: flex;

@@ -182,6 +182,16 @@ function mutate(description, fn) {
   render();
 }
 
+/* Der Rückgängig/Wiederholen-Shortcut wirkt global, auch während ein Modal
+   offen ist (siehe keydown-Handler). render() deckt nur die Hauptansicht ab,
+   also müssen Modal-Inhalte mit eigenem, nicht datengebundenem State separat
+   aufgefrischt werden. */
+function refreshOpenModalContent() {
+  if (!document.getElementById('recurring-modal').classList.contains('hidden')) {
+    renderRecurringList();
+  }
+}
+
 function undo() {
   if (undoStack.length === 0) return;
   const entry = undoStack.pop();
@@ -191,6 +201,7 @@ function undo() {
   saveData();
   updateUndoRedoButtons();
   render();
+  refreshOpenModalContent();
 }
 
 function redo() {
@@ -202,6 +213,7 @@ function redo() {
   saveData();
   updateUndoRedoButtons();
   render();
+  refreshOpenModalContent();
 }
 
 function updateUndoRedoButtons() {
@@ -2453,7 +2465,7 @@ function renderRecurringList() {
     btn.addEventListener('click', () => toggleRecurringActive(btn.dataset.toggleRecurring));
   });
   container.querySelectorAll('[data-delete-recurring]').forEach(btn => {
-    btn.addEventListener('click', () => deleteRecurringTemplate(btn.dataset.deleteRecurring));
+    btn.addEventListener('click', () => openEndRecurringModal(btn.dataset.deleteRecurring));
   });
 }
 
@@ -2466,12 +2478,37 @@ function toggleRecurringActive(id) {
   renderRecurringList();
 }
 
-function deleteRecurringTemplate(id) {
+function openEndRecurringModal(id) {
   const r = data.recurring.find(x => x.id === id);
   if (!r) return;
-  mutate(`Wiederkehrende Buchung "${getRecurringLabel(r)}" gelöscht`, () => {
+  const accountName = getAccountName(r.account);
+  document.getElementById('end-recurring-form').dataset.recurringId = id;
+  document.getElementById('end-recurring-info').textContent =
+    `${getRecurringLabel(r)} · Jeden ${r.dayOfMonth}. · ${accountName}`;
+  document.getElementById('end-recurring-date').value = new Date().toISOString().slice(0, 10);
+  openModal('end-recurring-modal');
+}
+
+function handleEndRecurringSubmit(e) {
+  e.preventDefault();
+  const id = document.getElementById('end-recurring-form').dataset.recurringId;
+  const fromDate = document.getElementById('end-recurring-date').value;
+  const r = data.recurring.find(x => x.id === id);
+  if (!r || !fromDate) return;
+
+  const label = getRecurringLabel(r);
+  const removedCount = data.entries.filter(e => e.recurringId === id && e.date >= fromDate).length;
+  const dateStr = dateFmt.format(new Date(fromDate + 'T00:00:00'));
+
+  mutate(`Wiederkehrende Buchung "${label}" ab ${dateStr} gelöscht (${removedCount} Buchung${removedCount === 1 ? '' : 'en'} entfernt)`, () => {
+    // Frühere, bereits erfasste Buchungen bleiben als normale Einträge stehen -
+    // nur ab dem gewählten Datum wird sowohl Historie als auch künftige
+    // Erzeugung entfernt.
+    data.entries = data.entries.filter(e => !(e.recurringId === id && e.date >= fromDate));
     data.recurring = data.recurring.filter(x => x.id !== id);
   });
+
+  closeModal('end-recurring-modal');
   renderRecurringList();
 }
 
@@ -2625,6 +2662,7 @@ function init() {
     renderRecurringList();
     openModal('recurring-modal');
   });
+  document.getElementById('end-recurring-form').addEventListener('submit', handleEndRecurringSubmit);
 
   document.getElementById('btn-clear-icon').addEventListener('click', () => {
     if (iconPickerTargetId) setCategoryIcon(iconPickerTargetId, '');
