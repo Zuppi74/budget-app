@@ -793,7 +793,7 @@ function renderCategoryRowHtml(cat, entries) {
   if (available !== 0 || spent !== 0) {
     const label = overspent ? 'Überzogen um' : 'Aktuell verfügbar';
     const color = overspent ? 'var(--expense)' : 'var(--income)';
-    remainingLine = `<div class="budget-cat-remaining" style="color:${color}">${label}: ${formatCurrency(Math.abs(remaining))}</div>`;
+    remainingLine = `<span class="budget-cat-remaining" style="color:${color}">${label}: ${formatCurrency(Math.abs(remaining))}</span>`;
   }
 
   const spentLine = spent > 0
@@ -811,7 +811,10 @@ function renderCategoryRowHtml(cat, entries) {
     <div class="budget-cat-row" data-cat-id="${cat.id}">
       <div class="budget-cat-top">
         <span class="${iconClass}" data-edit-icon="${cat.id}" title="Icon wählen">${iconDisplay}</span>
-        <span class="budget-cat-name" data-rename-cat="${cat.id}">${escapeHtml(cat.name)}</span>
+        <div class="budget-cat-title">
+          <span class="budget-cat-name" data-rename-cat="${cat.id}">${escapeHtml(cat.name)}</span>
+          ${remainingLine}
+        </div>
         <span class="budget-cat-amount" data-edit-budget="${cat.id}" title="Monatliches Budget bearbeiten">${formatCurrency(budget)}</span>
         <button type="button" class="icon-btn small" data-delete-cat="${cat.id}" aria-label="Kategorie löschen">✕</button>
       </div>
@@ -822,7 +825,6 @@ function renderCategoryRowHtml(cat, entries) {
         <span class="budget-bar-percent ${overspent ? 'overspent' : ''}" title="Noch verfügbar in %">${remainingPctDisplay}</span>
       </div>
       ${rolloverNote}
-      ${remainingLine}
       ${spentLine}
       ${transferButton}
     </div>`;
