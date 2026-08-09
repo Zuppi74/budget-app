@@ -755,13 +755,19 @@ function renderBudgetView() {
   });
 }
 
+function getGroupBudgetTotal(group) {
+  return group.categories.reduce((s, cat) => s + getBudget(cat.id, state.year, state.month), 0);
+}
+
 function renderGroupHtml(group, entries) {
   const rows = group.categories.map(cat => renderCategoryRowHtml(cat, entries)).join('');
+  const groupTotal = getGroupBudgetTotal(group);
   return `
     <div class="budget-group" data-group-id="${group.id}">
       <div class="budget-group-header">
         <button type="button" class="chevron-btn" data-toggle-group="${group.id}" aria-label="Gruppe auf-/zuklappen">${group.collapsed ? '›' : '⌄'}</button>
         <span class="budget-group-name" data-rename-group="${group.id}">${escapeHtml(group.name)}</span>
+        <span class="budget-group-total">${formatCurrency(groupTotal)}</span>
         <button type="button" class="icon-btn small" data-delete-group="${group.id}" aria-label="Gruppe löschen">✕</button>
       </div>
       <div class="budget-group-body ${group.collapsed ? 'hidden' : ''}">

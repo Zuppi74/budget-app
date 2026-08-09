@@ -966,6 +966,13 @@ body {
 
 .budget-group-name:hover { background: var(--border); }
 
+.budget-group-total {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
 .budget-group-body {
   padding: 4px 16px 14px;
 }
