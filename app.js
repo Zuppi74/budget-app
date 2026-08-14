@@ -68,6 +68,30 @@ function formatCurrency(amount) {
   return amount < 0 ? `-${formatted}` : formatted;
 }
 
+const foreignCurrencyFmtCache = {};
+
+/* Für Depot-Transaktionen in Fremdwährung: formatiert im eingegebenen
+   Code statt immer in CHF. Fällt bei ungültigen/frei getippten Codes auf
+   eine einfache "CODE Betrag"-Darstellung zurück statt abzustürzen. */
+function formatAmountInCurrency(amount, currencyCode) {
+  const code = (currencyCode || 'CHF').toUpperCase();
+  if (code === 'CHF') return formatCurrency(amount);
+  if (!foreignCurrencyFmtCache[code]) {
+    try {
+      foreignCurrencyFmtCache[code] = new Intl.NumberFormat('de-CH', { style: 'currency', currency: code });
+    } catch (e) {
+      foreignCurrencyFmtCache[code] = null;
+    }
+  }
+  const fmt = foreignCurrencyFmtCache[code];
+  if (!fmt) {
+    const formatted = quantityFmt.format(Math.abs(amount));
+    return `${amount < 0 ? '-' : ''}${code} ${formatted}`;
+  }
+  const formatted = fmt.format(Math.abs(amount));
+  return amount < 0 ? `-${formatted}` : formatted;
+}
+
 const quantityFmt = new Intl.NumberFormat('de-CH', { maximumFractionDigits: 6 });
 
 function formatQuantity(qty) {
@@ -1540,28 +1564,43 @@ function buildTxMetaHtml(tx) {
   const dateStr = dateFmt.format(new Date(tx.date + 'T00:00:00'));
   const rate = tx.exchangeRate || 1;
   const currencyNote = tx.currency !== 'CHF' ? ` · ${escapeHtml(tx.currency)} @ ${rate}` : '';
-  const feeNote = tx.fee ? ` · Courtage ${formatCurrency(tx.fee * rate)}` : '';
+  const feeNote = tx.fee ? ` · Courtage ${formatAmountInCurrency(tx.fee, tx.currency)}` : '';
   return `${dateStr} · ${formatQuantity(tx.quantity)} Stk.${currencyNote}${feeNote}`;
 }
 
+/* Bei Fremdwährungstransaktionen steht der tatsächlich eingegebene Betrag
+   in seiner Originalwährung im Vordergrund, die CHF-Umrechnung nur als
+   kleine Zusatzzeile - vorher wurde ausschliesslich CHF angezeigt. */
 function renderPurchaseRowHtml(holding, purchase) {
+  const chfAmount = getPurchaseCostCHF(purchase);
+  const isForeign = purchase.currency && purchase.currency !== 'CHF';
+  const primary = isForeign
+    ? formatAmountInCurrency(purchase.amount + (purchase.fee || 0), purchase.currency)
+    : formatCurrency(chfAmount);
+  const secondary = isForeign ? `<span class="tx-amount-chf">≈ ${formatCurrency(chfAmount)}</span>` : '';
   return `
     <div class="purchase-row" data-holding-id="${holding.id}" data-edit-purchase="${purchase.id}">
       <span class="tx-badge buy">Kauf</span>
       <span class="purchase-row-main">${buildTxMetaHtml(purchase)}</span>
-      <span class="purchase-row-amount">${formatCurrency(getPurchaseCostCHF(purchase))}</span>
+      <span class="purchase-row-amount">${primary}${secondary}</span>
     </div>`;
 }
 
 function renderSaleRowHtml(holding, sale) {
   const gain = getSaleGainCHF(holding, sale);
   const sign = gain >= 0 ? '+' : '';
+  const proceedsChf = getSaleProceedsCHF(sale);
+  const isForeign = sale.currency && sale.currency !== 'CHF';
+  const primary = isForeign
+    ? formatAmountInCurrency(sale.amount - (sale.fee || 0), sale.currency)
+    : formatCurrency(proceedsChf);
+  const secondary = isForeign ? `<span class="tx-amount-chf">≈ ${formatCurrency(proceedsChf)}</span>` : '';
   return `
     <div class="purchase-row" data-holding-id="${holding.id}" data-edit-sale="${sale.id}">
       <span class="tx-badge sell">Verkauf</span>
       <span class="purchase-row-main">${buildTxMetaHtml(sale)}</span>
       <span class="purchase-row-amount">
-        ${formatCurrency(getSaleProceedsCHF(sale))}
+        ${primary}${secondary}
         <span class="tx-gain ${gain < 0 ? 'negative' : 'positive'}">${sign}${formatCurrency(gain)}</span>
       </span>
     </div>`;

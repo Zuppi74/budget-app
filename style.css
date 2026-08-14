@@ -1730,6 +1730,12 @@ body {
 .tx-gain.positive { color: var(--income); }
 .tx-gain.negative { color: var(--expense); }
 
+.tx-amount-chf {
+  font-size: 0.74rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
 .holding-card.closed { opacity: 0.75; }
 
 .holding-tx-actions {
