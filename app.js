@@ -1508,6 +1508,12 @@ function renderHoldingHtml(depot, holding) {
     const invested = getHoldingCostBasisCHF(holding);
     const value = getHoldingCurrentValue(holding);
     const gain = value - invested;
+    // Kurs wurde in Fremdwährung erfasst -> als kleine Zusatzzeile zeigen,
+    // damit der eingegebene Kurs nicht hinter der CHF-Umrechnung verschwindet.
+    const nativeValueNote = (holding.currentValue != null && holding.currentPrice != null
+      && holding.currentPriceCurrency && holding.currentPriceCurrency !== 'CHF')
+      ? `<span class="tx-amount-chf">${formatAmountInCurrency(holding.currentPrice * qty, holding.currentPriceCurrency)}</span>`
+      : '';
     statsHtml = `
         <div class="holding-stat">
           <span class="holding-stat-label">Anzahl</span>
@@ -1520,6 +1526,7 @@ function renderHoldingHtml(depot, holding) {
         <div class="holding-stat editable" data-edit-current-value="${holding.id}" title="Aktuellen Wert bearbeiten">
           <span class="holding-stat-label">Akt. Wert</span>
           <span class="holding-stat-value">${holding.currentValue != null ? formatCurrency(value) : 'setzen'}</span>
+          ${nativeValueNote}
         </div>
         <div class="holding-stat">
           <span class="holding-stat-label">Gewinn/Verlust</span>
@@ -1910,12 +1917,60 @@ function deleteCurrentSale() {
   closeModal('sale-modal');
 }
 
+/* Währung/Kurs des jüngsten Kaufs als Vorschlag, falls noch nie ein
+   Kurs für den aktuellen Wert gesetzt wurde. */
+function getHoldingDefaultCurrency(holding) {
+  if (holding.purchases.length === 0) return { currency: 'CHF', exchangeRate: 1 };
+  const latest = holding.purchases.slice().sort((a, b) => b.date.localeCompare(a.date))[0];
+  return { currency: latest.currency, exchangeRate: latest.exchangeRate || 1 };
+}
+
 function openCurrentValueModal(holdingId) {
   const found = findHolding(holdingId);
   if (!found) return;
+  const holding = found.holding;
+  const qty = getHoldingTotalQuantity(holding);
   document.getElementById('current-value-form').dataset.holdingId = holdingId;
-  document.getElementById('current-value-input').value = found.holding.currentValue != null ? found.holding.currentValue : '';
+
+  let currency, rate, price;
+  if (holding.currentPrice != null) {
+    currency = holding.currentPriceCurrency || 'CHF';
+    rate = holding.currentPriceExchangeRate || 1;
+    price = holding.currentPrice;
+  } else {
+    const def = getHoldingDefaultCurrency(holding);
+    currency = def.currency;
+    rate = def.exchangeRate;
+    // Altdaten, die nur einen CHF-Totalwert kennen: Kurs daraus zurückrechnen,
+    // statt den Wert leer/verloren wirken zu lassen.
+    price = (holding.currentValue != null && qty > 0) ? (holding.currentValue / rate) / qty : null;
+  }
+
+  document.getElementById('current-value-price').value = price != null ? +price.toFixed(6) : '';
+  document.getElementById('current-value-currency').value = currency;
+  document.getElementById('current-value-exchange-rate').value = rate;
+  updateCurrentValuePreview();
   openModal('current-value-modal');
+}
+
+function updateCurrentValuePreview() {
+  const form = document.getElementById('current-value-form');
+  const el = document.getElementById('current-value-preview');
+  const found = findHolding(form.dataset.holdingId);
+  if (!found) { el.textContent = ''; return; }
+
+  const price = parseFloat(document.getElementById('current-value-price').value);
+  const rate = parseFloat(document.getElementById('current-value-exchange-rate').value) || 1;
+  const currency = document.getElementById('current-value-currency').value.trim() || 'CHF';
+  const qty = getHoldingTotalQuantity(found.holding);
+
+  if (!price || price <= 0 || qty <= 0) {
+    el.textContent = '';
+    return;
+  }
+
+  el.innerHTML = `${formatQuantity(qty)} Stk. × ${formatAmountInCurrency(price, currency)} =
+    <strong>${formatCurrency(price * qty * rate)}</strong>`;
 }
 
 function handleCurrentValueSubmit(e) {
@@ -1923,11 +1978,20 @@ function handleCurrentValueSubmit(e) {
   const holdingId = document.getElementById('current-value-form').dataset.holdingId;
   const found = findHolding(holdingId);
   if (!found) return;
-  const value = parseFloat(document.getElementById('current-value-input').value);
-  if (isNaN(value) || value < 0) return;
 
-  mutate(`Aktueller Wert von "${found.holding.name}" auf ${formatCurrency(value)} gesetzt`, () => {
-    found.holding.currentValue = value;
+  const price = parseFloat(document.getElementById('current-value-price').value);
+  const currency = document.getElementById('current-value-currency').value.trim().toUpperCase() || 'CHF';
+  const exchangeRate = parseFloat(document.getElementById('current-value-exchange-rate').value) || 1;
+  if (isNaN(price) || price < 0) return;
+
+  const qty = getHoldingTotalQuantity(found.holding);
+  const totalChf = price * qty * exchangeRate;
+
+  mutate(`Aktueller Kurs von "${found.holding.name}" auf ${formatAmountInCurrency(price, currency)} gesetzt (${formatCurrency(totalChf)})`, () => {
+    found.holding.currentValue = totalChf;
+    found.holding.currentPrice = price;
+    found.holding.currentPriceCurrency = currency;
+    found.holding.currentPriceExchangeRate = exchangeRate;
   });
   closeModal('current-value-modal');
 }
@@ -2872,6 +2936,9 @@ function init() {
   document.getElementById('purchase-quantity').addEventListener('input', updatePurchaseAmountFromPrice);
   document.getElementById('purchase-price').addEventListener('input', updatePurchaseAmountFromPrice);
   document.getElementById('current-value-form').addEventListener('submit', handleCurrentValueSubmit);
+  ['current-value-price', 'current-value-currency', 'current-value-exchange-rate'].forEach(id => {
+    document.getElementById(id).addEventListener('input', updateCurrentValuePreview);
+  });
 
   document.getElementById('sale-form').addEventListener('submit', handleSaleSubmit);
   document.getElementById('btn-delete-sale').addEventListener('click', deleteCurrentSale);
