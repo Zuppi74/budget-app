@@ -1686,11 +1686,17 @@ function openPurchaseModal(holdingId, purchaseId) {
     document.getElementById('purchase-fee').value = purchase.fee || 0;
     document.getElementById('purchase-currency').value = purchase.currency;
     document.getElementById('purchase-exchange-rate').value = purchase.exchangeRate;
+    // Nur zur Anzeige errechnet, nicht gespeichert - Betrag/Anzahl bleiben
+    // die eigentlichen Datenfelder.
+    document.getElementById('purchase-price').value = purchase.quantity > 0
+      ? +(purchase.amount / purchase.quantity).toFixed(6)
+      : '';
     deleteBtn.classList.remove('hidden');
   } else {
     document.getElementById('purchase-modal-title').textContent = 'Kauf hinzufügen';
     document.getElementById('purchase-date').value = new Date().toISOString().slice(0, 10);
     document.getElementById('purchase-quantity').value = '';
+    document.getElementById('purchase-price').value = '';
     document.getElementById('purchase-amount').value = '';
     document.getElementById('purchase-fee').value = 0;
     document.getElementById('purchase-currency').value = 'CHF';
@@ -1699,6 +1705,16 @@ function openPurchaseModal(holdingId, purchaseId) {
   }
 
   openModal('purchase-modal');
+}
+
+/* Einstandskurs ist reine Eingabehilfe: sobald Anzahl und Kurs pro Stück
+   vorliegen, wird der Betrag daraus berechnet und überschrieben. Wer
+   stattdessen direkt den Gesamtbetrag kennt, lässt den Kurs einfach leer. */
+function updatePurchaseAmountFromPrice() {
+  const quantity = parseFloat(document.getElementById('purchase-quantity').value);
+  const price = parseFloat(document.getElementById('purchase-price').value);
+  if (!quantity || quantity <= 0 || !price || price <= 0) return;
+  document.getElementById('purchase-amount').value = (quantity * price).toFixed(2);
 }
 
 function handlePurchaseSubmit(e) {
@@ -2853,6 +2869,8 @@ function init() {
   });
   document.getElementById('purchase-form').addEventListener('submit', handlePurchaseSubmit);
   document.getElementById('btn-delete-purchase').addEventListener('click', deleteCurrentPurchase);
+  document.getElementById('purchase-quantity').addEventListener('input', updatePurchaseAmountFromPrice);
+  document.getElementById('purchase-price').addEventListener('input', updatePurchaseAmountFromPrice);
   document.getElementById('current-value-form').addEventListener('submit', handleCurrentValueSubmit);
 
   document.getElementById('sale-form').addEventListener('submit', handleSaleSubmit);
