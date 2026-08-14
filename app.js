@@ -1107,10 +1107,14 @@ function renderAccountsView() {
     return;
   }
 
-  container.innerHTML = data.accounts.map(a => {
+  container.innerHTML = data.accounts.map((a, idx) => {
     const current = getAccountCurrentBalance(a.id);
     return `
     <div class="account-row" data-account-id="${a.id}">
+      <div class="account-move-btns">
+        <button type="button" class="move-btn" data-move-account="${a.id}" data-direction="-1" aria-label="Konto nach oben verschieben" ${idx === 0 ? 'disabled' : ''}>▲</button>
+        <button type="button" class="move-btn" data-move-account="${a.id}" data-direction="1" aria-label="Konto nach unten verschieben" ${idx === data.accounts.length - 1 ? 'disabled' : ''}>▼</button>
+      </div>
       <div class="account-info">
         <span class="account-name" data-rename-account="${a.id}">${escapeHtml(a.name)}</span>
         <div class="account-meta">
@@ -1135,6 +1139,20 @@ function renderAccountsView() {
   });
   container.querySelectorAll('[data-delete-account]').forEach(btn => {
     btn.addEventListener('click', () => deleteAccount(btn.dataset.deleteAccount));
+  });
+  container.querySelectorAll('[data-move-account]').forEach(btn => {
+    btn.addEventListener('click', () => moveAccount(btn.dataset.moveAccount, parseInt(btn.dataset.direction, 10)));
+  });
+}
+
+function moveAccount(accountId, direction) {
+  const idx = data.accounts.findIndex(a => a.id === accountId);
+  const newIdx = idx + direction;
+  if (idx === -1 || newIdx < 0 || newIdx >= data.accounts.length) return;
+  const account = data.accounts[idx];
+  mutate(`Konto "${account.name}" verschoben`, () => {
+    data.accounts.splice(idx, 1);
+    data.accounts.splice(newIdx, 0, account);
   });
 }
 
