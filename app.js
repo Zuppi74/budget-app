@@ -527,7 +527,7 @@ function renderEntries(entries) {
     const d = new Date(e.date + 'T00:00:00');
     const dateStr = dateFmt.format(d);
     const accountName = e.account ? getAccountName(e.account) : null;
-    const metaParts = [dateStr, accountName, e.note].filter(Boolean).map(escapeHtml);
+    const metaParts = [accountName, e.note].filter(Boolean).map(escapeHtml);
     const meta = metaParts.join(' · ');
     const sign = e.type === 'income' ? '+' : e.type === 'transfer' ? '⇄' : '−';
     const labelTag = e.label ? `<span class="entry-label-tag">${escapeHtml(e.label)}</span>` : '';
@@ -539,6 +539,7 @@ function renderEntries(entries) {
         ${iconEl}
         <div class="entry-main">
           <span class="entry-category-row">
+            <span class="entry-date">${dateStr} ·</span>
             <span class="entry-category">${escapeHtml(getEntryCategoryLabel(e))}</span>
             ${labelTag}
             ${recurringBadge}
