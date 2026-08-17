@@ -1242,6 +1242,17 @@ function deleteAccount(accountId) {
   if (data.accounts.length <= 1) return;
   const account = findAccount(accountId);
   if (!account) return;
+
+  const linkedCount = data.entries.filter(e =>
+    e.account === accountId || e.fromAccount === accountId || e.toAccount === accountId
+  ).length;
+  const warning = linkedCount > 0
+    ? linkedCount === 1
+      ? ` 1 Buchung bleibt erhalten, zeigt aber "Gelöschtes Konto".`
+      : ` ${linkedCount} Buchungen bleiben erhalten, zeigen aber "Gelöschtes Konto".`
+    : '';
+  if (!confirm(`Konto "${account.name}" wirklich löschen?${warning}`)) return;
+
   mutate(`Konto "${account.name}" gelöscht`, () => {
     data.accounts = data.accounts.filter(a => a.id !== accountId);
   });
