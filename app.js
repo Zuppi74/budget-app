@@ -564,6 +564,20 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+const ACCOUNT_TYPE_ICONS = {
+  'Lohnkonto': '💼',
+  'Sparkonto': '🏦',
+  'Kreditkarte': '💳',
+  'Bargeld': '💵',
+  'Krypto': '🪙',
+  'Investment': '📈',
+  'Sonstiges': '📁'
+};
+
+function getAccountTypeIcon(type) {
+  return ACCOUNT_TYPE_ICONS[type] || '📁';
+}
+
 function renderAccountBalancesPanel() {
   const container = document.getElementById('account-balances-list');
   if (data.accounts.length === 0) {
@@ -575,6 +589,7 @@ function renderAccountBalancesPanel() {
     const current = getAccountCurrentBalance(a.id);
     return `
     <div class="account-balance-item">
+      <span class="account-balance-icon">${getAccountTypeIcon(a.type)}</span>
       <span class="account-balance-name">${escapeHtml(a.name)}</span>
       <span class="account-balance-amount" style="color:${current < 0 ? 'var(--expense)' : 'var(--text)'}">${formatCurrency(current)}</span>
     </div>`;
@@ -656,6 +671,11 @@ function buildDonutChartHtml(items) {
   }).join('');
 
   const svg = `<svg viewBox="0 0 ${size} ${size}" width="180" height="180">${circles}</svg>`;
+  const centerHtml = `
+    <div class="donut-center">
+      <span class="donut-center-value">${formatCurrency(total)}</span>
+      <span class="donut-center-label">Total</span>
+    </div>`;
 
   const legend = items.map((item, i) => {
     const color = CHART_COLORS[i % CHART_COLORS.length];
@@ -669,25 +689,30 @@ function buildDonutChartHtml(items) {
       </div>`;
   }).join('');
 
-  return `${svg}<div class="chart-legend">${legend}</div>`;
+  return `<div class="donut-wrap">${svg}${centerHtml}</div><div class="chart-legend">${legend}</div>`;
 }
 
-function buildColumnChartHtml(items) {
+function buildBarListHtml(items) {
+  const total = items.reduce((s, i) => s + i.value, 0);
   const maxValue = Math.max(...items.map(i => i.value), 1);
-  const maxHeight = 120;
 
-  const bars = items.map((item, i) => {
+  const rows = items.map((item, i) => {
     const color = CHART_COLORS[i % CHART_COLORS.length];
-    const height = Math.max((item.value / maxValue) * maxHeight, 3);
+    const share = total > 0 ? (item.value / total) * 100 : 0;
+    const widthPct = Math.max((item.value / maxValue) * 100, 2);
     return `
-      <div class="column-item">
-        <span class="bar-value">${formatCurrency(item.value)}</span>
-        <div class="column-shape" style="height:${height}px;background:${color}"></div>
-        <span class="column-label">${escapeHtml(item.name)}</span>
+      <div class="bar-list-row">
+        <div class="bar-list-top">
+          <span class="bar-list-name">${escapeHtml(item.name)}</span>
+          <span class="bar-list-value">${formatCurrency(item.value)} <span class="bar-list-share">${share.toFixed(1).replace('.', ',')} %</span></span>
+        </div>
+        <div class="bar-list-track">
+          <div class="bar-list-fill" style="width:${widthPct}%;background:${color}"></div>
+        </div>
       </div>`;
   }).join('');
 
-  return `<div class="column-chart">${bars}</div>`;
+  return `<div class="bar-list">${rows}</div>`;
 }
 
 function renderChart(entries) {
@@ -708,7 +733,7 @@ function renderChart(entries) {
     .map(([categoryId, value]) => ({ categoryId, name: getCategoryDisplayName(categoryId), value }))
     .sort((a, b) => b.value - a.value);
 
-  container.innerHTML = buildColumnChartHtml(items);
+  container.innerHTML = buildBarListHtml(items);
 }
 
 function renderLabelChart(entries) {
