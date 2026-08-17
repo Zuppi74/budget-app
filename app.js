@@ -113,7 +113,7 @@ const state = {
   reportYear: today.getFullYear(),
   currentType: 'expense',
   view: 'overview',
-  entryFilters: { dateFrom: '', dateTo: '', category: 'all', account: 'all', label: 'all' }
+  entryFilters: { dateFrom: '', dateTo: '', categoryGroup: 'all', category: 'all', account: 'all', label: 'all' }
 };
 
 function structuredCloneData(obj) {
@@ -417,7 +417,7 @@ function renderSummary(entries) {
 
 function isEntryFilterActive() {
   const f = state.entryFilters;
-  return !!(f.dateFrom || f.dateTo || f.category !== 'all' || f.account !== 'all' || f.label !== 'all');
+  return !!(f.dateFrom || f.dateTo || f.categoryGroup !== 'all' || f.category !== 'all' || f.account !== 'all' || f.label !== 'all');
 }
 
 function getFilteredEntries(monthEntries) {
@@ -427,6 +427,10 @@ function getFilteredEntries(monthEntries) {
     .filter(e => {
       if (f.dateFrom && e.date < f.dateFrom) return false;
       if (f.dateTo && e.date > f.dateTo) return false;
+      if (f.categoryGroup !== 'all') {
+        const found = e.type === 'expense' ? findCategory(e.category) : null;
+        if (!found || found.group.id !== f.categoryGroup) return false;
+      }
       if (f.category !== 'all' && e.category !== f.category) return false;
       if (f.account !== 'all') {
         const matchesAccount = e.type === 'transfer'
@@ -441,6 +445,12 @@ function getFilteredEntries(monthEntries) {
 }
 
 function populateEntryFilters() {
+  const groupSelect = document.getElementById('filter-category-group');
+  const prevGroup = groupSelect.value || 'all';
+  groupSelect.innerHTML = '<option value="all">Alle Gruppen</option>' +
+    data.categoryGroups.map(g => `<option value="${g.id}">${escapeHtml(g.name)}</option>`).join('');
+  groupSelect.value = prevGroup;
+
   const categorySelect = document.getElementById('filter-category');
   const prevCat = categorySelect.value || 'all';
   const expenseOptions = data.categoryGroups.map(group => {
@@ -469,6 +479,7 @@ function readEntryFiltersFromInputs() {
   state.entryFilters = {
     dateFrom: document.getElementById('filter-date-from').value,
     dateTo: document.getElementById('filter-date-to').value,
+    categoryGroup: document.getElementById('filter-category-group').value,
     category: document.getElementById('filter-category').value,
     account: document.getElementById('filter-account').value,
     label: document.getElementById('filter-label').value
@@ -479,14 +490,32 @@ function readEntryFiltersFromInputs() {
 function clearEntryFilters() {
   document.getElementById('filter-date-from').value = '';
   document.getElementById('filter-date-to').value = '';
+  document.getElementById('filter-category-group').value = 'all';
   document.getElementById('filter-category').value = 'all';
   document.getElementById('filter-account').value = 'all';
   document.getElementById('filter-label').value = 'all';
-  state.entryFilters = { dateFrom: '', dateTo: '', category: 'all', account: 'all', label: 'all' };
+  state.entryFilters = { dateFrom: '', dateTo: '', categoryGroup: 'all', category: 'all', account: 'all', label: 'all' };
   render();
 }
 
+function renderFilterGroupSum(entries) {
+  const el = document.getElementById('filter-group-sum');
+  const groupId = state.entryFilters.categoryGroup;
+  if (groupId === 'all') {
+    el.classList.add('hidden');
+    return;
+  }
+  const group = data.categoryGroups.find(g => g.id === groupId);
+  const groupName = group ? group.name : 'Gruppe';
+  // getFilteredEntries lässt bei aktivem Gruppenfilter nur Ausgaben dieser
+  // Gruppe durch, daher genügt eine einfache Summe.
+  const sum = entries.reduce((s, e) => s + e.amount, 0);
+  el.textContent = `Summe "${groupName}": ${formatCurrency(sum)} (${entries.length} ${entries.length === 1 ? 'Eintrag' : 'Einträge'})`;
+  el.classList.remove('hidden');
+}
+
 function renderEntries(entries) {
+  renderFilterGroupSum(entries);
   const container = document.getElementById('entries-list');
   if (entries.length === 0) {
     const message = isEntryFilterActive() ? 'Keine Einträge gefunden.' : 'Keine Einträge in diesem Monat.';
@@ -2894,7 +2923,7 @@ function init() {
 
   document.getElementById('btn-add-entry').addEventListener('click', () => openEntryModal(null));
 
-  ['filter-date-from', 'filter-date-to', 'filter-category', 'filter-account', 'filter-label'].forEach(id => {
+  ['filter-date-from', 'filter-date-to', 'filter-category-group', 'filter-category', 'filter-account', 'filter-label'].forEach(id => {
     document.getElementById(id).addEventListener('change', readEntryFiltersFromInputs);
   });
   document.getElementById('btn-clear-filters').addEventListener('click', clearEntryFilters);

@@ -345,6 +345,16 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
+.filter-group-sum {
+  margin: -6px 0 14px;
+  padding: 8px 12px;
+  background: var(--bg);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
 .entry-filters input,
 .entry-filters select {
   flex: 1;
