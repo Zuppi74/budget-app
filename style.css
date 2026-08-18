@@ -314,12 +314,39 @@ body {
     font-size: 0.85rem;
   }
 
-  .report-panel { overflow-x: auto; }
-
   .report-table { font-size: 0.82rem; }
 
   .report-table th,
   .report-table td { padding: 8px 10px; white-space: nowrap; }
+
+  /* Fünf Spalten (Monat, Einnahmen, Ausgaben, Saldo, Kumuliert) statt der
+     vier der Auswertung - braucht engere Ränder, damit sie ohne seitliches
+     Scrollen auf ein iPhone passt. Muss nach der Regel oben stehen, sonst
+     verliert sie bei gleicher Spezifität. */
+  /* table-layout:auto ignoriert width-Hinweise auf einzelnen Zellen und
+     verteilt nach Inhalt - mit fixed werden die Prozentangaben unten
+     verbindlich, das hält die Tabelle innerhalb der Bildschirmbreite. */
+  .forecast-table { table-layout: fixed; width: 100%; }
+
+  .forecast-table th,
+  .forecast-table td { padding: 6px 2px; font-size: 0.72rem; }
+
+  .forecast-table th { white-space: normal; }
+  .forecast-table td { white-space: nowrap; }
+
+  .forecast-table th:first-child,
+  .forecast-table td:first-child { width: 11%; }
+
+  .forecast-table th:nth-child(2),
+  .forecast-table td:nth-child(2),
+  .forecast-table th:nth-child(3),
+  .forecast-table td:nth-child(3) { width: 23%; }
+
+  .forecast-table th:nth-child(4),
+  .forecast-table td:nth-child(4) { width: 21%; }
+
+  .forecast-table th:nth-child(5),
+  .forecast-table td:nth-child(5) { width: 22%; }
 
   .modal { max-width: none; width: calc(100% - 24px); padding: 16px; }
 
@@ -1530,6 +1557,13 @@ body {
   overflow: hidden;
 }
 
+/* Muss nach der Basisregel stehen - der @media-Block weiter oben in dieser
+   Datei würde bei gleicher Spezifität sonst gegen "overflow: hidden" verlieren
+   und die Tabelle liesse sich auf dem Handy nicht seitlich scrollen. */
+@media (max-width: 600px) {
+  .report-panel { overflow-x: auto; }
+}
+
 .report-table {
   width: 100%;
   border-collapse: collapse;
@@ -1550,6 +1584,17 @@ body {
 .report-table th:not(:first-child),
 .report-table td:not(:first-child) {
   text-align: right;
+}
+
+/* Muss nach der Basisregel .report-table th stehen, sonst verliert sie bei
+   gleicher Spezifität - die Forecast-Kopfzeile braucht auf schmalen
+   Bildschirmen mehr Platzersparnis als die Auswertung. */
+@media (max-width: 600px) {
+  .forecast-table th {
+    font-size: 0.62rem;
+    letter-spacing: 0;
+    text-transform: none;
+  }
 }
 
 .report-table td {

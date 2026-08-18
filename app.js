@@ -68,6 +68,15 @@ function formatCurrency(amount) {
   return amount < 0 ? `-${formatted}` : formatted;
 }
 
+const numberFmt = new Intl.NumberFormat('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/* Ohne "CHF"-Präfix für enge Tabellen (z.B. die Forecast-Monatstabelle auf
+   dem Handy), wo jedes Zeichen für die Spaltenbreite zählt. */
+function formatAmountCompact(amount) {
+  const formatted = numberFmt.format(Math.abs(amount));
+  return amount < 0 ? `-${formatted}` : formatted;
+}
+
 const foreignCurrencyFmtCache = {};
 
 /* Für Depot-Transaktionen in Fremdwährung: formatiert im eingegebenen
@@ -2162,18 +2171,18 @@ function renderForecastView() {
     cumulative += saldo;
     rows.push(`<tr>
       <td>${MONTH_SHORT[m]}</td>
-      <td class="col-income">${income[m] ? formatCurrency(income[m]) : '–'}</td>
-      <td class="col-expense">${expense[m] ? formatCurrency(expense[m]) : '–'}</td>
-      <td class="${saldo < 0 ? 'col-expense' : ''}">${formatCurrency(saldo)}</td>
-      <td class="${cumulative < 0 ? 'col-expense' : ''}">${formatCurrency(cumulative)}</td>
+      <td class="col-income">${income[m] ? formatAmountCompact(income[m]) : '–'}</td>
+      <td class="col-expense">${expense[m] ? formatAmountCompact(expense[m]) : '–'}</td>
+      <td class="${saldo < 0 ? 'col-expense' : ''}">${formatAmountCompact(saldo)}</td>
+      <td class="${cumulative < 0 ? 'col-expense' : ''}">${formatAmountCompact(cumulative)}</td>
     </tr>`);
   }
   document.getElementById('forecast-table-body').innerHTML = rows.join('');
   document.getElementById('forecast-table-foot').innerHTML = `<tr>
     <td>Jahr</td>
-    <td class="col-income">${formatCurrency(yearIncome)}</td>
-    <td class="col-expense">${formatCurrency(yearExpense)}</td>
-    <td class="${yearSaldo < 0 ? 'col-expense' : ''}">${formatCurrency(yearSaldo)}</td>
+    <td class="col-income">${formatAmountCompact(yearIncome)}</td>
+    <td class="col-expense">${formatAmountCompact(yearExpense)}</td>
+    <td class="${yearSaldo < 0 ? 'col-expense' : ''}">${formatAmountCompact(yearSaldo)}</td>
     <td></td>
   </tr>`;
 
