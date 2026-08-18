@@ -671,78 +671,6 @@ body {
   border-radius: 5px 0 0 5px;
 }
 
-.chart-legend {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.85rem;
-}
-
-.legend-swatch {
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
-  flex-shrink: 0;
-}
-
-.legend-label {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.legend-value {
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
-.legend-share {
-  color: var(--text-muted);
-  font-size: 0.78rem;
-  white-space: nowrap;
-  min-width: 46px;
-  text-align: right;
-}
-
-.donut-wrap {
-  position: relative;
-  width: 180px;
-  height: 180px;
-  flex-shrink: 0;
-}
-
-.donut-center {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  pointer-events: none;
-}
-
-.donut-center-value {
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--text);
-}
-
-.donut-center-label {
-  font-size: 0.66rem;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
 .bar-list {
   display: flex;
   flex-direction: column;
@@ -2010,6 +1938,11 @@ body {
 .trend-caption.up { color: var(--expense); }
 .trend-caption.down { color: var(--income); }
 .trend-caption.neutral { color: var(--text-muted); }
+
+/* Für die Vermögensentwicklung: steigend ist positiv (grün), anders als
+   bei "up"/"down" oben, wo steigende Ausgaben schlecht sind. */
+.trend-caption.positive { color: var(--income); }
+.trend-caption.negative { color: var(--expense); }
 
 /* ---------- Forecast (Jahresplanung) ---------- */
 

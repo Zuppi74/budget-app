@@ -652,53 +652,20 @@ function renderSaldoBar(income, expense) {
   const pct = Math.min((Math.abs(saldo) / scale) * 50, 50);
   const fillClass = saldo >= 0 ? 'positive' : 'negative';
   const valueColor = saldo < 0 ? 'var(--expense)' : 'var(--income)';
+  // % Gewinn/Verlust = Saldo im Verhältnis zu den Einnahmen des Monats
+  // (klassische Sparquote). Ohne Einnahmen lässt sich das nicht sinnvoll
+  // ausdrücken, daher dort nur der CHF-Betrag.
+  const valueText = income > 0 ? formatGainWithPct(saldo, income) : formatCurrency(saldo);
 
   container.innerHTML = `
     <div class="saldo-bar-label-row">
       <span class="saldo-bar-label">Saldo</span>
-      <span class="saldo-bar-value" style="color:${valueColor}">${formatCurrency(saldo)}</span>
+      <span class="saldo-bar-value" style="color:${valueColor}">${valueText}</span>
     </div>
     <div class="saldo-bar-track">
       <div class="saldo-bar-fill ${fillClass}" style="width:${pct}%"></div>
       <div class="saldo-bar-center"></div>
     </div>`;
-}
-
-function buildDonutChartHtml(items) {
-  const total = items.reduce((s, i) => s + i.value, 0);
-  const size = 160, r = 60, sw = 28, cx = size / 2, cy = size / 2;
-  const circumference = 2 * Math.PI * r;
-
-  let cumulative = 0;
-  const circles = items.map((item, i) => {
-    const fraction = item.value / total;
-    const segLen = Math.max(fraction * circumference, 0);
-    const rotation = -90 + (cumulative / total) * 360;
-    cumulative += item.value;
-    const color = CHART_COLORS[i % CHART_COLORS.length];
-    return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="${sw}" stroke-dasharray="${segLen} ${circumference - segLen}" transform="rotate(${rotation} ${cx} ${cy})"></circle>`;
-  }).join('');
-
-  const svg = `<svg viewBox="0 0 ${size} ${size}" width="180" height="180">${circles}</svg>`;
-  const centerHtml = `
-    <div class="donut-center">
-      <span class="donut-center-value">${formatCurrency(total)}</span>
-      <span class="donut-center-label">Total</span>
-    </div>`;
-
-  const legend = items.map((item, i) => {
-    const color = CHART_COLORS[i % CHART_COLORS.length];
-    const share = total > 0 ? (item.value / total) * 100 : 0;
-    return `
-      <div class="legend-item">
-        <span class="legend-swatch" style="background:${color}"></span>
-        <span class="legend-label">${escapeHtml(item.name)}</span>
-        <span class="legend-share">${share.toFixed(1).replace('.', ',')} %</span>
-        <span class="legend-value">${formatCurrency(item.value)}</span>
-      </div>`;
-  }).join('');
-
-  return `<div class="donut-wrap">${svg}${centerHtml}</div><div class="chart-legend">${legend}</div>`;
 }
 
 function buildBarListHtml(items) {
@@ -743,27 +710,6 @@ function renderChart(entries) {
     .sort((a, b) => b.value - a.value);
 
   container.innerHTML = buildBarListHtml(items);
-}
-
-function renderLabelChart(entries) {
-  const container = document.getElementById('label-chart-container');
-  const labeledExpenses = entries.filter(e => e.type === 'expense' && e.label);
-
-  if (labeledExpenses.length === 0) {
-    container.innerHTML = '<p class="empty-hint">Keine Ausgaben mit Label in diesem Monat.</p>';
-    return;
-  }
-
-  const totals = {};
-  labeledExpenses.forEach(e => {
-    totals[e.label] = (totals[e.label] || 0) + e.amount;
-  });
-
-  const items = Object.entries(totals)
-    .map(([name, value]) => ({ name, value }))
-    .sort((a, b) => b.value - a.value);
-
-  container.innerHTML = buildDonutChartHtml(items);
 }
 
 function getTotalBudgetForCurrentMonth() {
@@ -2391,8 +2337,93 @@ function renderReportView() {
       <td style="color:${totalBalance < 0 ? 'var(--expense)' : 'var(--income)'}">${formatCurrency(totalBalance)}</td>
     </tr>`;
 
+  renderNetWorthTrendChart();
   renderExpenseTrendChart(monthly);
   renderReportCategoryTable();
+}
+
+/* Summe aller Kontostände unter Berücksichtigung nur der Buchungen bis
+   und mit dem Stichtag - im Gegensatz zu getAccountCurrentBalance(), die
+   unabhängig vom Datum wirklich alle Buchungen zählt. */
+function getTotalNetWorthUpTo(cutoffDate) {
+  return data.accounts.reduce((total, account) => {
+    const delta = data.entries.reduce((s, e) => {
+      if (e.date > cutoffDate) return s;
+      if (e.type === 'transfer') {
+        if (e.fromAccount === account.id) return s - e.amount;
+        if (e.toAccount === account.id) return s + e.amount;
+        return s;
+      }
+      if (e.account !== account.id) return s;
+      return s + (e.type === 'income' ? e.amount : -e.amount);
+    }, 0);
+    return total + account.balance + delta;
+  }, 0);
+}
+
+function getNetWorthTrendForYear(year) {
+  return Array.from({ length: 12 }, (_, m) => {
+    const cutoff = `${year}-${String(m + 1).padStart(2, '0')}-${String(daysInMonth(year, m)).padStart(2, '0')}`;
+    return getTotalNetWorthUpTo(cutoff);
+  });
+}
+
+function renderNetWorthTrendChart() {
+  const container = document.getElementById('report-networth-chart');
+
+  if (data.accounts.length === 0) {
+    container.innerHTML = '<p class="empty-hint">Keine Konten angelegt.</p>';
+    return;
+  }
+
+  const values = getNetWorthTrendForYear(state.reportYear);
+
+  const W = 360, H = 176;
+  const padL = 8, padR = 8, padT = 14, padB = 6;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+  const slot = plotW / 12;
+  const xCenter = i => padL + slot * (i + 0.5);
+  const baseY = padT + plotH;
+
+  const minV = Math.min(...values, 0);
+  const maxV = Math.max(...values, 0);
+  const range = (maxV - minV) || 1;
+  const pad = range * 0.12;
+  const scaleMin = minV - pad;
+  const scaleMax = maxV + pad;
+  const yFor = v => baseY - ((v - scaleMin) / (scaleMax - scaleMin)) * plotH;
+
+  const points = values.map((v, i) => `${xCenter(i).toFixed(1)},${yFor(v).toFixed(1)}`);
+  const areaPath = `M ${xCenter(0).toFixed(1)},${baseY.toFixed(1)} L ${points.join(' L ')} L ${xCenter(11).toFixed(1)},${baseY.toFixed(1)} Z`;
+  const linePath = `M ${points.join(' L ')}`;
+  const dots = values.map((v, i) => `<circle cx="${xCenter(i).toFixed(1)}" cy="${yFor(v).toFixed(1)}" r="2.5" fill="var(--accent)"></circle>`).join('');
+
+  const zeroLine = (scaleMin < 0 && scaleMax > 0)
+    ? `<line x1="${padL}" y1="${yFor(0).toFixed(1)}" x2="${W - padR}" y2="${yFor(0).toFixed(1)}" stroke="var(--border)" stroke-width="1" vector-effect="non-scaling-stroke"></line>`
+    : `<line x1="${padL}" y1="${baseY.toFixed(1)}" x2="${W - padR}" y2="${baseY.toFixed(1)}" stroke="var(--border)" stroke-width="1" vector-effect="non-scaling-stroke"></line>`;
+
+  const first = values[0];
+  const last = values[11];
+  const change = last - first;
+  const changePct = first !== 0 ? (change / Math.abs(first)) * 100 : 0;
+  const sign = change >= 0 ? '+' : '';
+  const captionClass = Math.abs(change) < 0.005 ? 'neutral' : change > 0 ? 'positive' : 'negative';
+  const caption = Math.abs(change) < 0.005
+    ? 'Das Vermögen ist über das Jahr etwa gleich geblieben.'
+    : `${change > 0 ? 'Zuwachs' : 'Rückgang'}: ${sign}${formatCurrency(change)} (${sign}${changePct.toFixed(1).replace('.', ',')} %) seit Januar.`;
+
+  const labels = MONTH_SHORT.map(name => `<span>${name}</span>`).join('');
+
+  container.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Vermögensentwicklung über das Jahr">
+      ${zeroLine}
+      <path d="${areaPath}" fill="var(--accent)" opacity="0.12"></path>
+      <path d="${linePath}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"></path>
+      ${dots}
+    </svg>
+    <div class="trend-months">${labels}</div>
+    <p class="trend-caption ${captionClass}">${caption}</p>`;
 }
 
 /* Lineare Regression über die Monatswerte: liefert Steigung und
@@ -2557,7 +2588,6 @@ function render() {
   renderAccountBalancesPanel();
   renderBarChart(entries);
   renderChart(entries);
-  renderLabelChart(entries);
   if (state.view === 'budget') renderBudgetView();
   if (state.view === 'accounts') renderAccountsView();
   if (state.view === 'report') renderReportView();
