@@ -2368,6 +2368,53 @@ function getNetWorthTrendForYear(year) {
   });
 }
 
+/* Kompakte, gerundete Achsenbeschriftung ohne CHF-Präfix und Rappen -
+   für eine grobe Werteskala reicht das, exakte Beträge stehen ohnehin
+   in der Bildunterschrift und der Monatstabelle darüber. */
+function formatAxisValue(amount) {
+  return Math.round(amount).toLocaleString('de-CH');
+}
+
+/* Horizontale Referenzlinien mit Wertbeschriftung für die Trend-Charts.
+   Die Linien liegen im SVG (reine Striche verzerren nicht), die Zahlen
+   dagegen als HTML-Overlay darüber - Text im gestreckten SVG
+   (preserveAspectRatio="none") würde sonst seitenverzerrt gezeichnet. */
+function buildTrendGrid(scaleMin, scaleMax, W, H, padL, padR, yFor, steps) {
+  steps = steps || 3;
+  let gridLines = '';
+  let gridLabels = '';
+  for (let i = 0; i <= steps; i++) {
+    const v = scaleMin + (scaleMax - scaleMin) * (i / steps);
+    const y = yFor(v);
+    gridLines += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W - padR}" y2="${y.toFixed(1)}" stroke="var(--border)" stroke-width="1" vector-effect="non-scaling-stroke"></line>`;
+    gridLabels += `<span class="trend-grid-label" style="top:${(y / H * 100).toFixed(2)}%">${formatAxisValue(v)}</span>`;
+  }
+  return { gridLines, gridLabels };
+}
+
+/* Weiche Kurve durch alle Punkte (Catmull-Rom in kubische Bézier
+   umgerechnet) statt scharfer Liniensegmente - der Standard-"Look" bei
+   modernen Finanz-Charts. */
+function buildSmoothPath(points) {
+  if (points.length < 2) return '';
+  if (points.length === 2) {
+    return `M ${points[0].x.toFixed(1)},${points[0].y.toFixed(1)} L ${points[1].x.toFixed(1)},${points[1].y.toFixed(1)}`;
+  }
+  let d = `M ${points[0].x.toFixed(1)},${points[0].y.toFixed(1)} `;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i === 0 ? 0 : i - 1];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2 < points.length ? i + 2 : i + 1];
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+    d += `C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)} `;
+  }
+  return d.trim();
+}
+
 function renderNetWorthTrendChart() {
   const container = document.getElementById('report-networth-chart');
 
@@ -2386,22 +2433,29 @@ function renderNetWorthTrendChart() {
   const xCenter = i => padL + slot * (i + 0.5);
   const baseY = padT + plotH;
 
-  const minV = Math.min(...values, 0);
-  const maxV = Math.max(...values, 0);
-  const range = (maxV - minV) || 1;
+  // Bewusst NICHT auf 0 erweitert: das würde bei durchgehend positivem
+  // Vermögen einen grossen leeren Bereich erzwingen und den eigentlichen
+  // Verlauf stauchen. Ist das Vermögen wirklich mal negativ, zeigt sich
+  // das an den Achsenwerten selbst.
+  const minV = Math.min(...values);
+  const maxV = Math.max(...values);
+  const range = (maxV - minV) || Math.max(Math.abs(maxV), 1);
   const pad = range * 0.12;
   const scaleMin = minV - pad;
   const scaleMax = maxV + pad;
   const yFor = v => baseY - ((v - scaleMin) / (scaleMax - scaleMin)) * plotH;
 
-  const points = values.map((v, i) => `${xCenter(i).toFixed(1)},${yFor(v).toFixed(1)}`);
-  const areaPath = `M ${xCenter(0).toFixed(1)},${baseY.toFixed(1)} L ${points.join(' L ')} L ${xCenter(11).toFixed(1)},${baseY.toFixed(1)} Z`;
-  const linePath = `M ${points.join(' L ')}`;
-  const dots = values.map((v, i) => `<circle cx="${xCenter(i).toFixed(1)}" cy="${yFor(v).toFixed(1)}" r="2.5" fill="var(--accent)"></circle>`).join('');
+  const pts = values.map((v, i) => ({ x: xCenter(i), y: yFor(v) }));
+  const linePath = buildSmoothPath(pts);
+  const areaPath = `${linePath} L ${pts[11].x.toFixed(1)},${baseY.toFixed(1)} L ${pts[0].x.toFixed(1)},${baseY.toFixed(1)} Z`;
+  // Als HTML statt <circle>: preserveAspectRatio="none" skaliert X und Y
+  // unterschiedlich stark, ein im SVG gezeichneter Kreis würde dadurch
+  // oval statt rund erscheinen.
+  const dots = pts.map(p =>
+    `<span class="trend-dot" style="left:${(p.x / W * 100).toFixed(2)}%;top:${(p.y / H * 100).toFixed(2)}%"></span>`
+  ).join('');
 
-  const zeroLine = (scaleMin < 0 && scaleMax > 0)
-    ? `<line x1="${padL}" y1="${yFor(0).toFixed(1)}" x2="${W - padR}" y2="${yFor(0).toFixed(1)}" stroke="var(--border)" stroke-width="1" vector-effect="non-scaling-stroke"></line>`
-    : `<line x1="${padL}" y1="${baseY.toFixed(1)}" x2="${W - padR}" y2="${baseY.toFixed(1)}" stroke="var(--border)" stroke-width="1" vector-effect="non-scaling-stroke"></line>`;
+  const { gridLines, gridLabels } = buildTrendGrid(scaleMin, scaleMax, W, H, padL, padR, yFor);
 
   const first = values[0];
   const last = values[11];
@@ -2416,12 +2470,21 @@ function renderNetWorthTrendChart() {
   const labels = MONTH_SHORT.map(name => `<span>${name}</span>`).join('');
 
   container.innerHTML = `
-    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Vermögensentwicklung über das Jahr">
-      ${zeroLine}
-      <path d="${areaPath}" fill="var(--accent)" opacity="0.12"></path>
-      <path d="${linePath}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"></path>
-      ${dots}
-    </svg>
+    <div class="trend-plot">
+      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Vermögensentwicklung über das Jahr">
+        <defs>
+          <linearGradient id="networth-fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.25"></stop>
+            <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"></stop>
+          </linearGradient>
+        </defs>
+        ${gridLines}
+        <path d="${areaPath}" fill="url(#networth-fill)"></path>
+        <path d="${linePath}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"></path>
+      </svg>
+      <div class="trend-grid-labels">${gridLabels}</div>
+      <div class="trend-dots">${dots}</div>
+    </div>
     <div class="trend-months">${labels}</div>
     <p class="trend-caption ${captionClass}">${caption}</p>`;
 }
@@ -2496,14 +2559,17 @@ function renderExpenseTrendChart(monthly) {
   // sie mitskalieren und je nach Bildschirmbreite zu gross oder zu klein.
   const labels = MONTH_SHORT.map(name => `<span>${name}</span>`).join('');
 
-  const baseline = `<line x1="${padL}" y1="${baseY}" x2="${W - padR}" y2="${baseY}" stroke="var(--border)" stroke-width="1" vector-effect="non-scaling-stroke"></line>`;
+  const { gridLines, gridLabels } = buildTrendGrid(0, maxValue, W, H, padL, padR, yFor);
 
   const trendClass = !fit ? 'neutral' : fit.slope > 0.005 ? 'up' : fit.slope < -0.005 ? 'down' : 'neutral';
 
   container.innerHTML = `
-    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Ausgaben pro Monat mit Trendlinie">
-      ${baseline}${bars}${avgLine}${trendLine}
-    </svg>
+    <div class="trend-plot">
+      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Ausgaben pro Monat mit Trendlinie">
+        ${gridLines}${bars}${avgLine}${trendLine}
+      </svg>
+      <div class="trend-grid-labels">${gridLabels}</div>
+    </div>
     <div class="trend-months">${labels}</div>
     <div class="trend-legend">
       <span class="trend-legend-item"><span class="trend-swatch bar"></span>Ausgaben pro Monat</span>

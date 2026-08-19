@@ -1880,6 +1880,47 @@ body {
   .trend-chart svg { height: 120px; }
 }
 
+/* Trägt die Wertbeschriftung des Rasters: position:relative auf einer
+   eigenen Hülle statt direkt auf .trend-chart, damit die Höhe exakt der
+   des SVG entspricht (die Beschriftung ist an dessen Y-Positionen
+   ausgerichtet). */
+.trend-plot { position: relative; }
+
+.trend-grid-labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.trend-grid-label {
+  position: absolute;
+  left: 2px;
+  transform: translateY(-50%);
+  font-size: 0.62rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: var(--surface);
+  padding: 1px 4px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.trend-dots {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.trend-dot {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 1.5px solid var(--surface);
+  transform: translate(-50%, -50%);
+}
+
 /* Gleiche seitliche Einrückung wie das SVG (8 von 360 Einheiten),
    damit die Namen unter ihren Säulen stehen. */
 .trend-months {
