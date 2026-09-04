@@ -532,6 +532,8 @@ function renderEntries(entries) {
     return;
   }
 
+  const todayStr = new Date().toISOString().slice(0, 10);
+
   container.innerHTML = entries.map(e => {
     const d = new Date(e.date + 'T00:00:00');
     const dateStr = dateFmt.format(d);
@@ -541,10 +543,12 @@ function renderEntries(entries) {
     const sign = e.type === 'income' ? '+' : e.type === 'transfer' ? '⇄' : '−';
     const labelTag = e.label ? `<span class="entry-label-tag">${escapeHtml(e.label)}</span>` : '';
     const recurringBadge = e.recurringId ? `<span class="entry-recurring-badge" title="Wiederkehrende Buchung">↻</span>` : '';
+    const isPending = e.date > todayStr;
+    const pendingBadge = isPending ? `<span class="entry-pending-badge" title="Noch nicht verbucht">geplant</span>` : '';
     const icon = e.type === 'expense' ? getCategoryIcon(e.category) : e.type === 'transfer' ? '🔁' : '';
     const iconEl = icon ? `<span class="entry-icon">${icon}</span>` : '';
     return `
-      <div class="entry-row" data-id="${e.id}" data-type="${e.type}">
+      <div class="entry-row${isPending ? ' entry-row-pending' : ''}" data-id="${e.id}" data-type="${e.type}">
         ${iconEl}
         <div class="entry-main">
           <span class="entry-category-row">
@@ -552,6 +556,7 @@ function renderEntries(entries) {
             <span class="entry-category">${escapeHtml(getEntryCategoryLabel(e))}</span>
             ${labelTag}
             ${recurringBadge}
+            ${pendingBadge}
           </span>
           <span class="entry-meta">${meta}</span>
         </div>

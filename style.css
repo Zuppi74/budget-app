@@ -560,6 +560,31 @@ body {
 .entry-amount.expense { color: var(--expense); }
 .entry-amount.transfer { color: var(--text-muted); }
 
+.entry-row-pending {
+  border-style: dashed;
+  background: var(--bg);
+}
+
+.entry-row-pending .entry-category,
+.entry-row-pending .entry-date,
+.entry-row-pending .entry-meta,
+.entry-row-pending .entry-amount.income,
+.entry-row-pending .entry-amount.expense {
+  color: var(--text-muted);
+}
+
+.entry-pending-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  border: 1px dashed var(--text-muted);
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-left: 2px;
+}
+
 .empty-hint {
   color: var(--text-muted);
   font-size: 0.9rem;
