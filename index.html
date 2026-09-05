@@ -6,6 +6,12 @@
 <title>Budget-App</title>
 <link rel="icon" href="favicon.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#3d7a5c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Budget-App">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -91,6 +97,18 @@
         </div>
         <div id="chart-container" class="chart-container">
           <p class="empty-hint">Keine Ausgaben in diesem Monat.</p>
+        </div>
+      </section>
+
+      <section class="panel savings-goals-panel">
+        <div class="panel-header">
+          <h2><span class="panel-icon">🎯</span>Sparziele</h2>
+          <div class="panel-header-actions">
+            <button id="btn-add-savings-goal" class="btn-primary">+ Sparziel</button>
+          </div>
+        </div>
+        <div id="savings-goals-list" class="savings-goals-list">
+          <p class="empty-hint">Noch keine Sparziele angelegt.</p>
         </div>
       </section>
 
@@ -574,6 +592,35 @@
   </div>
 </div>
 
+<div id="savings-goal-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="savings-goal-modal-title">Sparziel hinzufügen</h3>
+      <button class="icon-btn modal-close" data-close="savings-goal-modal" aria-label="Schließen">✕</button>
+    </div>
+    <form id="savings-goal-form">
+      <input type="hidden" id="savings-goal-id">
+
+      <label for="savings-goal-name">Name</label>
+      <input type="text" id="savings-goal-name" placeholder="z. B. Notgroschen" required>
+
+      <label for="savings-goal-amount">Zielbetrag (CHF)</label>
+      <input type="number" id="savings-goal-amount" step="0.01" min="0.01" placeholder="0,00" required>
+
+      <label for="savings-goal-account">Bezugsgrösse</label>
+      <select id="savings-goal-account"></select>
+
+      <label for="savings-goal-date">Zieldatum (optional)</label>
+      <input type="date" id="savings-goal-date">
+
+      <div class="modal-actions">
+        <button type="button" id="btn-delete-savings-goal" class="btn-danger hidden">Löschen</button>
+        <button type="submit" class="btn-primary">Speichern</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <div id="icon-picker-modal" class="modal-overlay hidden">
   <div class="modal">
     <div class="modal-header">
@@ -616,5 +663,12 @@
 </div>
 
 <script src="app.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('service-worker.js').catch(() => {});
+    });
+  }
+</script>
 </body>
 </html>

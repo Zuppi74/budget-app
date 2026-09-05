@@ -1657,6 +1657,66 @@ body {
   font-size: 0.92rem;
 }
 
+.savings-goals-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.savings-goal-item {
+  cursor: pointer;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.savings-goal-item:hover { background: var(--bg); }
+
+.savings-goal-header {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 10px;
+  margin-bottom: 6px;
+}
+
+.savings-goal-name {
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.savings-goal-amounts {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.savings-goal-bar-track {
+  height: 8px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.savings-goal-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+}
+
+.savings-goal-bar-fill.reached { background: var(--income); }
+
+.savings-goal-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 6px;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
 .depot-view {
   display: flex;
   flex-direction: column;

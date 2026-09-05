@@ -45,6 +45,7 @@ const DEFAULT_DATA = {
   recurring: [],
   depots: [],
   forecast: { positions: [] },
+  savingsGoals: [],
   recentMoves: []
 };
 
@@ -160,6 +161,7 @@ function normalizeData(d) {
   d.depots = d.depots || [];
   d.forecast = d.forecast || { positions: [] };
   d.forecast.positions = d.forecast.positions || [];
+  d.savingsGoals = d.savingsGoals || [];
   return ensureAccounts(d);
 }
 
@@ -617,6 +619,118 @@ function renderAccountBalancesPanel() {
     </div>`;
 
   container.innerHTML = items + totalRow;
+}
+
+function getTotalCurrentNetWorth() {
+  return data.accounts.reduce((s, a) => s + getAccountCurrentBalance(a.id), 0);
+}
+
+function getSavingsGoalCurrentValue(goal) {
+  return goal.accountId ? getAccountCurrentBalance(goal.accountId) : getTotalCurrentNetWorth();
+}
+
+function renderSavingsGoalsPanel() {
+  const container = document.getElementById('savings-goals-list');
+  if (!data.savingsGoals || data.savingsGoals.length === 0) {
+    container.innerHTML = '<p class="empty-hint">Noch keine Sparziele angelegt.</p>';
+    return;
+  }
+
+  container.innerHTML = data.savingsGoals.map(g => {
+    const current = getSavingsGoalCurrentValue(g);
+    const pct = g.targetAmount > 0 ? Math.min(100, Math.max(0, (current / g.targetAmount) * 100)) : 0;
+    const reached = current >= g.targetAmount;
+    const scopeLabel = g.accountId ? getAccountName(g.accountId) : 'Gesamtvermögen';
+    const dateHint = g.targetDate ? ` · bis ${dateFmt.format(new Date(g.targetDate + 'T00:00:00'))}` : '';
+    const statusText = reached
+      ? 'Ziel erreicht 🎉'
+      : `noch ${formatCurrency(g.targetAmount - current)} (${pct.toFixed(0)} %)`;
+    return `
+      <div class="savings-goal-item" data-id="${g.id}">
+        <div class="savings-goal-header">
+          <span class="savings-goal-name">${escapeHtml(g.name)}</span>
+          <span class="savings-goal-amounts">${formatCurrency(current)} / ${formatCurrency(g.targetAmount)}</span>
+        </div>
+        <div class="savings-goal-bar-track">
+          <div class="savings-goal-bar-fill${reached ? ' reached' : ''}" style="width:${pct.toFixed(1)}%"></div>
+        </div>
+        <div class="savings-goal-meta">
+          <span>${escapeHtml(scopeLabel)}${dateHint}</span>
+          <span>${statusText}</span>
+        </div>
+      </div>`;
+  }).join('');
+
+  container.querySelectorAll('.savings-goal-item').forEach(el => {
+    el.addEventListener('click', () => openSavingsGoalModal(el.dataset.id));
+  });
+}
+
+function populateSavingsGoalAccountSelect() {
+  const select = document.getElementById('savings-goal-account');
+  select.innerHTML = '<option value="">Gesamtvermögen (alle Konten)</option>' +
+    data.accounts.map(a => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('');
+}
+
+function openSavingsGoalModal(id) {
+  const form = document.getElementById('savings-goal-form');
+  form.reset();
+  populateSavingsGoalAccountSelect();
+  const deleteBtn = document.getElementById('btn-delete-savings-goal');
+
+  if (id) {
+    const goal = data.savingsGoals.find(g => g.id === id);
+    if (!goal) return;
+    document.getElementById('savings-goal-modal-title').textContent = 'Sparziel bearbeiten';
+    document.getElementById('savings-goal-id').value = goal.id;
+    document.getElementById('savings-goal-name').value = goal.name;
+    document.getElementById('savings-goal-amount').value = goal.targetAmount;
+    document.getElementById('savings-goal-date').value = goal.targetDate || '';
+    document.getElementById('savings-goal-account').value = goal.accountId || '';
+    deleteBtn.classList.remove('hidden');
+  } else {
+    document.getElementById('savings-goal-modal-title').textContent = 'Sparziel hinzufügen';
+    document.getElementById('savings-goal-id').value = '';
+    deleteBtn.classList.add('hidden');
+  }
+  openModal('savings-goal-modal');
+}
+
+function handleSavingsGoalSubmit(e) {
+  e.preventDefault();
+  const id = document.getElementById('savings-goal-id').value;
+  const name = document.getElementById('savings-goal-name').value.trim();
+  const targetAmount = parseFloat(document.getElementById('savings-goal-amount').value);
+  const targetDate = document.getElementById('savings-goal-date').value;
+  const accountId = document.getElementById('savings-goal-account').value;
+  if (!name || isNaN(targetAmount) || targetAmount <= 0) return;
+
+  if (id) {
+    mutate(`Sparziel "${name}" bearbeitet`, () => {
+      const goal = data.savingsGoals.find(g => g.id === id);
+      if (!goal) return;
+      goal.name = name;
+      goal.targetAmount = targetAmount;
+      goal.targetDate = targetDate;
+      goal.accountId = accountId;
+    });
+  } else {
+    mutate(`Sparziel "${name}" hinzugefügt`, () => {
+      data.savingsGoals.push({ id: uid(), name, targetAmount, targetDate, accountId });
+    });
+  }
+  closeModal('savings-goal-modal');
+}
+
+function deleteCurrentSavingsGoal() {
+  const id = document.getElementById('savings-goal-id').value;
+  const goal = data.savingsGoals.find(g => g.id === id);
+  if (!goal) return;
+  if (!confirm(`Sparziel "${goal.name}" wirklich löschen?`)) return;
+  mutate(`Sparziel "${goal.name}" gelöscht`, () => {
+    data.savingsGoals = data.savingsGoals.filter(g => g.id !== id);
+  });
+  closeModal('savings-goal-modal');
 }
 
 function renderBarChart(entries) {
@@ -2657,6 +2771,7 @@ function render() {
   renderSummary(entries);
   renderEntries(getFilteredEntries(entries));
   renderAccountBalancesPanel();
+  renderSavingsGoalsPanel();
   renderBarChart(entries);
   renderChart(entries);
   if (state.view === 'budget') renderBudgetView();
@@ -3150,6 +3265,10 @@ function init() {
   document.querySelectorAll('[data-forecast-preset]').forEach(btn => {
     btn.addEventListener('click', () => applyForecastPreset(btn.dataset.forecastPreset));
   });
+
+  document.getElementById('btn-add-savings-goal').addEventListener('click', () => openSavingsGoalModal(null));
+  document.getElementById('savings-goal-form').addEventListener('submit', handleSavingsGoalSubmit);
+  document.getElementById('btn-delete-savings-goal').addEventListener('click', deleteCurrentSavingsGoal);
 
   document.querySelectorAll('.modal-close').forEach(btn => {
     btn.addEventListener('click', () => closeModal(btn.dataset.close));
