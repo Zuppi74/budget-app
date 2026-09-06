@@ -123,7 +123,7 @@ const state = {
   reportYear: today.getFullYear(),
   currentType: 'expense',
   view: 'overview',
-  entryFilters: { dateFrom: '', dateTo: '', categoryGroup: 'all', category: 'all', account: 'all', label: 'all' }
+  entryFilters: { text: '', dateFrom: '', dateTo: '', categoryGroup: 'all', category: 'all', account: 'all', label: 'all' }
 };
 
 function structuredCloneData(obj) {
@@ -428,14 +428,28 @@ function renderSummary(entries) {
 
 function isEntryFilterActive() {
   const f = state.entryFilters;
-  return !!(f.dateFrom || f.dateTo || f.categoryGroup !== 'all' || f.category !== 'all' || f.account !== 'all' || f.label !== 'all');
+  return !!(f.text || f.dateFrom || f.dateTo || f.categoryGroup !== 'all' || f.category !== 'all' || f.account !== 'all' || f.label !== 'all');
+}
+
+/* Durchsucht Notiz, Label, Kategorie-/Überweisungsbezeichnung und Konto
+   als einen einzigen Text, statt für jedes Feld einen eigenen Filter
+   zu verlangen. */
+function entryMatchesSearchText(e, query) {
+  const accountNames = e.type === 'transfer'
+    ? `${getAccountName(e.fromAccount)} ${getAccountName(e.toAccount)}`
+    : (e.account ? getAccountName(e.account) : '');
+  const haystack = [e.note, e.label, getEntryCategoryLabel(e), accountNames]
+    .filter(Boolean).join(' ').toLowerCase();
+  return haystack.includes(query);
 }
 
 function getFilteredEntries(monthEntries) {
   if (!isEntryFilterActive()) return monthEntries;
   const f = state.entryFilters;
+  const query = f.text.trim().toLowerCase();
   return data.entries
     .filter(e => {
+      if (query && !entryMatchesSearchText(e, query)) return false;
       if (f.dateFrom && e.date < f.dateFrom) return false;
       if (f.dateTo && e.date > f.dateTo) return false;
       if (f.categoryGroup !== 'all') {
@@ -488,6 +502,7 @@ function populateEntryFilters() {
 
 function readEntryFiltersFromInputs() {
   state.entryFilters = {
+    text: document.getElementById('filter-text').value,
     dateFrom: document.getElementById('filter-date-from').value,
     dateTo: document.getElementById('filter-date-to').value,
     categoryGroup: document.getElementById('filter-category-group').value,
@@ -499,13 +514,14 @@ function readEntryFiltersFromInputs() {
 }
 
 function clearEntryFilters() {
+  document.getElementById('filter-text').value = '';
   document.getElementById('filter-date-from').value = '';
   document.getElementById('filter-date-to').value = '';
   document.getElementById('filter-category-group').value = 'all';
   document.getElementById('filter-category').value = 'all';
   document.getElementById('filter-account').value = 'all';
   document.getElementById('filter-label').value = 'all';
-  state.entryFilters = { dateFrom: '', dateTo: '', categoryGroup: 'all', category: 'all', account: 'all', label: 'all' };
+  state.entryFilters = { text: '', dateFrom: '', dateTo: '', categoryGroup: 'all', category: 'all', account: 'all', label: 'all' };
   render();
 }
 
@@ -3188,6 +3204,7 @@ function init() {
   ['filter-date-from', 'filter-date-to', 'filter-category-group', 'filter-category', 'filter-account', 'filter-label'].forEach(id => {
     document.getElementById(id).addEventListener('change', readEntryFiltersFromInputs);
   });
+  document.getElementById('filter-text').addEventListener('input', readEntryFiltersFromInputs);
   document.getElementById('btn-clear-filters').addEventListener('click', clearEntryFilters);
 
   document.getElementById('btn-settings').addEventListener('click', () => {

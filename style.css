@@ -442,6 +442,11 @@ body {
   padding: 7px 12px;
 }
 
+.entry-filters .filter-search {
+  flex: 2;
+  min-width: 200px;
+}
+
 .btn-primary {
   background: var(--accent);
   color: #fff;
