@@ -2282,7 +2282,8 @@ function renderForecastPositionList(type) {
     return;
   }
 
-  container.innerHTML = positions.map(renderForecastPositionRow).join('');
+  const typeTotal = positions.reduce((s, p) => s + getForecastPositionYearTotal(p), 0);
+  container.innerHTML = positions.map(p => renderForecastPositionRow(p, type === 'expense' ? typeTotal : null)).join('');
   container.querySelectorAll('[data-edit-forecast]').forEach(el => {
     el.addEventListener('click', () => openForecastPositionModal(null, el.dataset.editForecast));
   });
@@ -2294,16 +2295,22 @@ function renderForecastPositionList(type) {
   });
 }
 
-function renderForecastPositionRow(p) {
+function renderForecastPositionRow(p, typeTotal) {
   const yearTotal = getForecastPositionYearTotal(p);
   const perMonth = p.months && p.months.length > 1 ? `je ${formatCurrency(p.amount)}` : formatCurrency(p.amount);
+  const pctTag = (typeTotal > 0)
+    ? `<span class="forecast-item-pct">${((yearTotal / typeTotal) * 100).toFixed(1).replace('.', ',')} %</span>`
+    : '';
   return `
     <div class="forecast-item" data-edit-forecast="${p.id}">
       <div class="forecast-item-info">
         <span class="forecast-item-name">${escapeHtml(getForecastPositionLabel(p))}</span>
         <span class="forecast-item-meta">${escapeHtml(formatMonthsList(p.months))} · ${perMonth}</span>
       </div>
-      <span class="forecast-item-total ${p.type}">${formatCurrency(yearTotal)}</span>
+      <div class="forecast-item-amounts">
+        <span class="forecast-item-total ${p.type}">${formatCurrency(yearTotal)}</span>
+        ${pctTag}
+      </div>
       <button type="button" class="icon-btn small" data-delete-forecast="${p.id}" aria-label="Position löschen">✕</button>
     </div>`;
 }

@@ -2132,6 +2132,19 @@ body {
 .forecast-item-total.income { color: var(--income); }
 .forecast-item-total.expense { color: var(--expense); }
 
+.forecast-item-amounts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.forecast-item-pct {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
 .forecast-presets {
   display: flex;
   flex-wrap: wrap;
