@@ -1851,7 +1851,15 @@ body {
   min-width: 0;
 }
 
-.holding-stat.editable { cursor: pointer; }
+.holding-stat.editable {
+  cursor: pointer;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 4px 8px;
+  margin: -4px -8px;
+}
+
+.holding-stat.editable:hover { background: var(--bg); }
 .holding-stat.editable:hover .holding-stat-value { text-decoration: underline; }
 
 .holding-stat-label {
