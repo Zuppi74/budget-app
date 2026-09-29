@@ -552,35 +552,19 @@ function renderEntries(entries) {
 
   const todayStr = new Date().toISOString().slice(0, 10);
 
-  container.innerHTML = entries.map(e => {
-    const d = new Date(e.date + 'T00:00:00');
-    const dateStr = dateFmt.format(d);
-    const accountName = e.account ? getAccountName(e.account) : null;
-    const metaParts = [accountName, e.note].filter(Boolean).map(escapeHtml);
-    const meta = metaParts.join(' · ');
-    const sign = e.type === 'income' ? '+' : e.type === 'transfer' ? '⇄' : '−';
-    const labelTag = e.label ? `<span class="entry-label-tag">${escapeHtml(e.label)}</span>` : '';
-    const recurringBadge = e.recurringId ? `<span class="entry-recurring-badge" title="Wiederkehrende Buchung">↻</span>` : '';
-    const isPending = e.date > todayStr;
-    const pendingBadge = isPending ? `<span class="entry-pending-badge" title="Noch nicht verbucht">geplant</span>` : '';
-    const icon = e.type === 'expense' ? getCategoryIcon(e.category) : e.type === 'transfer' ? '🔁' : '';
-    const iconEl = icon ? `<span class="entry-icon">${icon}</span>` : '';
-    return `
-      <div class="entry-row${isPending ? ' entry-row-pending' : ''}" data-id="${e.id}" data-type="${e.type}">
-        ${iconEl}
-        <div class="entry-main">
-          <span class="entry-category-row">
-            <span class="entry-date">${dateStr} ·</span>
-            <span class="entry-category">${escapeHtml(getEntryCategoryLabel(e))}</span>
-            ${labelTag}
-            ${recurringBadge}
-            ${pendingBadge}
-          </span>
-          <span class="entry-meta">${meta}</span>
-        </div>
-        <span class="entry-amount ${e.type}">${sign} ${formatCurrency(e.amount)}</span>
-      </div>`;
-  }).join('');
+  // Einträge kommen nach Datum sortiert an, daher liegen Einträge derselben
+  // Woche immer direkt hintereinander.
+  const weeks = [];
+  entries.forEach(e => {
+    const info = getIsoWeekInfo(e.date);
+    const last = weeks[weeks.length - 1];
+    if (last && last.info.key === info.key) last.entries.push(e);
+    else weeks.push({ info, entries: [e] });
+  });
+
+  container.innerHTML = weeks.map(({ info, entries: weekEntries }) =>
+    renderWeekHeader(info, weekEntries) + weekEntries.map(e => renderEntryRow(e, todayStr)).join('')
+  ).join('');
 
   container.querySelectorAll('.entry-row').forEach(row => {
     row.addEventListener('click', () => {
@@ -588,6 +572,68 @@ function renderEntries(entries) {
       else openEntryModal(row.dataset.id);
     });
   });
+}
+
+/* ISO-Woche: beginnt am Montag, KW 1 ist die Woche mit dem ersten
+   Donnerstag des Jahres. In UTC gerechnet, damit Sommerzeitwechsel die
+   Tagesdifferenzen nicht verfälschen. */
+function getIsoWeekInfo(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  const monday = new Date(date);
+  monday.setUTCDate(date.getUTCDate() - (date.getUTCDay() + 6) % 7);
+  const sunday = new Date(monday);
+  sunday.setUTCDate(monday.getUTCDate() + 6);
+  const thursday = new Date(monday);
+  thursday.setUTCDate(monday.getUTCDate() + 3);
+  const yearStart = Date.UTC(thursday.getUTCFullYear(), 0, 1);
+  const week = Math.floor((thursday - yearStart) / 86400000 / 7) + 1;
+  return { key: monday.toISOString().slice(0, 10), week, monday, sunday };
+}
+
+function renderWeekHeader(info, weekEntries) {
+  const fmt = dt => `${String(dt.getUTCDate()).padStart(2, '0')}.${String(dt.getUTCMonth() + 1).padStart(2, '0')}.`;
+  const expense = weekEntries.filter(e => e.type === 'expense').reduce((s, e) => s + e.amount, 0);
+  const income = weekEntries.filter(e => e.type === 'income').reduce((s, e) => s + e.amount, 0);
+  const sums = [
+    expense > 0 ? `<span class="entry-week-expense">− ${formatCurrency(expense)}</span>` : '',
+    income > 0 ? `<span class="entry-week-income">+ ${formatCurrency(income)}</span>` : ''
+  ].join('');
+  return `
+    <div class="entry-week-header">
+      <span class="entry-week-title">KW ${info.week} <span class="entry-week-range">${fmt(info.monday)}–${fmt(info.sunday)}</span></span>
+      <span class="entry-week-sums">${sums}</span>
+    </div>`;
+}
+
+function renderEntryRow(e, todayStr) {
+  const d = new Date(e.date + 'T00:00:00');
+  const dateStr = dateFmt.format(d);
+  const accountName = e.account ? getAccountName(e.account) : null;
+  const metaParts = [accountName, e.note].filter(Boolean).map(escapeHtml);
+  const meta = metaParts.join(' · ');
+  const sign = e.type === 'income' ? '+' : e.type === 'transfer' ? '⇄' : '−';
+  const labelTag = e.label ? `<span class="entry-label-tag">${escapeHtml(e.label)}</span>` : '';
+  const recurringBadge = e.recurringId ? `<span class="entry-recurring-badge" title="Wiederkehrende Buchung">↻</span>` : '';
+  const isPending = e.date > todayStr;
+  const pendingBadge = isPending ? `<span class="entry-pending-badge" title="Noch nicht verbucht">geplant</span>` : '';
+  const icon = e.type === 'expense' ? getCategoryIcon(e.category) : e.type === 'transfer' ? '🔁' : '';
+  const iconEl = icon ? `<span class="entry-icon">${icon}</span>` : '';
+  return `
+    <div class="entry-row${isPending ? ' entry-row-pending' : ''}" data-id="${e.id}" data-type="${e.type}">
+      ${iconEl}
+      <div class="entry-main">
+        <span class="entry-category-row">
+          <span class="entry-date">${dateStr} ·</span>
+          <span class="entry-category">${escapeHtml(getEntryCategoryLabel(e))}</span>
+          ${labelTag}
+          ${recurringBadge}
+          ${pendingBadge}
+        </span>
+        <span class="entry-meta">${meta}</span>
+      </div>
+      <span class="entry-amount ${e.type}">${sign} ${formatCurrency(e.amount)}</span>
+    </div>`;
 }
 
 function escapeHtml(str) {

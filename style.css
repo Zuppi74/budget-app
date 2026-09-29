@@ -565,6 +565,41 @@ body {
 .entry-amount.expense { color: var(--expense); }
 .entry-amount.transfer { color: var(--text-muted); }
 
+.entry-week-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 8px 4px 4px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.82rem;
+}
+
+.entry-week-header:not(:first-child) { margin-top: 6px; }
+
+.entry-week-title { font-weight: 600; }
+
+.entry-week-range {
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-left: 4px;
+}
+
+.entry-week-sums {
+  display: flex;
+  gap: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.entry-week-expense { color: var(--expense); }
+.entry-week-income { color: var(--income); }
+
 .entry-row-pending {
   border-style: dashed;
   background: var(--bg);
