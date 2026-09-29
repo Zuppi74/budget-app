@@ -123,7 +123,8 @@ const state = {
   reportYear: today.getFullYear(),
   currentType: 'expense',
   view: 'overview',
-  entryFilters: { text: '', dateFrom: '', dateTo: '', categoryGroup: 'all', category: 'all', account: 'all', label: 'all' }
+  entryFilters: { text: '', dateFrom: '', dateTo: '', categoryGroup: 'all', category: 'all', account: 'all', label: 'all' },
+  collapsedWeeks: new Set()
 };
 
 function structuredCloneData(obj) {
@@ -562,9 +563,26 @@ function renderEntries(entries) {
     else weeks.push({ info, entries: [e] });
   });
 
-  container.innerHTML = weeks.map(({ info, entries: weekEntries }) =>
-    renderWeekHeader(info, weekEntries) + weekEntries.map(e => renderEntryRow(e, todayStr)).join('')
-  ).join('');
+  container.innerHTML = weeks.map(({ info, entries: weekEntries }) => {
+    const collapsed = state.collapsedWeeks.has(info.key);
+    return `
+      <div class="entry-week${collapsed ? ' collapsed' : ''}" data-week="${info.key}">
+        ${renderWeekHeader(info, weekEntries, collapsed)}
+        <div class="entry-week-body">${weekEntries.map(e => renderEntryRow(e, todayStr)).join('')}</div>
+      </div>`;
+  }).join('');
+
+  container.querySelectorAll('.entry-week-header').forEach(header => {
+    header.addEventListener('click', () => {
+      const week = header.closest('.entry-week');
+      const key = week.dataset.week;
+      const collapsed = !state.collapsedWeeks.has(key);
+      if (collapsed) state.collapsedWeeks.add(key);
+      else state.collapsedWeeks.delete(key);
+      week.classList.toggle('collapsed', collapsed);
+      header.setAttribute('aria-expanded', String(!collapsed));
+    });
+  });
 
   container.querySelectorAll('.entry-row').forEach(row => {
     row.addEventListener('click', () => {
@@ -591,7 +609,7 @@ function getIsoWeekInfo(dateStr) {
   return { key: monday.toISOString().slice(0, 10), week, monday, sunday };
 }
 
-function renderWeekHeader(info, weekEntries) {
+function renderWeekHeader(info, weekEntries, collapsed) {
   const fmt = dt => `${String(dt.getUTCDate()).padStart(2, '0')}.${String(dt.getUTCMonth() + 1).padStart(2, '0')}.`;
   const expense = weekEntries.filter(e => e.type === 'expense').reduce((s, e) => s + e.amount, 0);
   const income = weekEntries.filter(e => e.type === 'income').reduce((s, e) => s + e.amount, 0);
@@ -600,10 +618,13 @@ function renderWeekHeader(info, weekEntries) {
     income > 0 ? `<span class="entry-week-income">+ ${formatCurrency(income)}</span>` : ''
   ].join('');
   return `
-    <div class="entry-week-header">
-      <span class="entry-week-title">KW ${info.week} <span class="entry-week-range">${fmt(info.monday)}–${fmt(info.sunday)}</span></span>
+    <button type="button" class="entry-week-header" aria-expanded="${!collapsed}">
+      <span class="entry-week-title">
+        <svg class="entry-week-chevron" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        KW ${info.week} <span class="entry-week-range">${fmt(info.monday)}–${fmt(info.sunday)}</span>
+      </span>
       <span class="entry-week-sums">${sums}</span>
-    </div>`;
+    </button>`;
 }
 
 function renderEntryRow(e, todayStr) {

@@ -565,22 +565,54 @@ body {
 .entry-amount.expense { color: var(--expense); }
 .entry-amount.transfer { color: var(--text-muted); }
 
+/* Sticky innerhalb von .entry-week: die Kopfzeile bleibt nur so lange
+   oben stehen, wie ihre eigene Woche sichtbar ist. */
 .entry-week-header {
   position: sticky;
   top: 0;
   z-index: 1;
+  width: 100%;
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 4px 12px;
-  padding: 8px 4px 4px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  /* Deckender Tönungs-Hintergrund, damit beim Scrollen keine Einträge
+     durch die klebende Kopfzeile durchscheinen. */
+  background: linear-gradient(rgba(61, 122, 92, 0.12), rgba(61, 122, 92, 0.12)), var(--surface);
+  color: var(--text);
+  font-family: inherit;
   font-size: 0.82rem;
+  text-align: left;
+  cursor: pointer;
 }
 
-.entry-week-header:not(:first-child) { margin-top: 6px; }
+.entry-week-header:hover {
+  background: linear-gradient(rgba(61, 122, 92, 0.2), rgba(61, 122, 92, 0.2)), var(--surface);
+}
+
+.entry-week-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.entry-week.collapsed .entry-week-body { display: none; }
+
+.entry-week-chevron {
+  width: 14px;
+  height: 14px;
+  margin-right: 4px;
+  vertical-align: -2px;
+  color: var(--accent);
+  transition: transform 0.15s;
+}
+
+.entry-week.collapsed .entry-week-chevron { transform: rotate(-90deg); }
 
 .entry-week-title { font-weight: 600; }
 
