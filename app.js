@@ -613,17 +613,18 @@ function renderWeekHeader(info, weekEntries, collapsed) {
   const fmt = dt => `${String(dt.getUTCDate()).padStart(2, '0')}.${String(dt.getUTCMonth() + 1).padStart(2, '0')}.`;
   const expense = weekEntries.filter(e => e.type === 'expense').reduce((s, e) => s + e.amount, 0);
   const income = weekEntries.filter(e => e.type === 'income').reduce((s, e) => s + e.amount, 0);
-  const sums = [
-    expense > 0 ? `<span class="entry-week-expense">− ${formatCurrency(expense)}</span>` : '',
-    income > 0 ? `<span class="entry-week-income">+ ${formatCurrency(income)}</span>` : ''
-  ].join('');
+  const incomeSum = income > 0 ? `<span class="entry-week-income">+ ${formatCurrency(income)}</span>` : '';
+  const expenseSum = expense > 0 ? `<span class="entry-week-expense">− ${formatCurrency(expense)}</span>` : '';
   return `
     <button type="button" class="entry-week-header" aria-expanded="${!collapsed}">
-      <span class="entry-week-title">
-        <svg class="entry-week-chevron" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        KW ${info.week} <span class="entry-week-range">${fmt(info.monday)}–${fmt(info.sunday)}</span>
+      <span class="entry-week-left">
+        <span class="entry-week-title">
+          <svg class="entry-week-chevron" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          KW ${info.week} <span class="entry-week-range">${fmt(info.monday)}–${fmt(info.sunday)}</span>
+        </span>
+        ${incomeSum}
       </span>
-      <span class="entry-week-sums">${sums}</span>
+      ${expenseSum}
     </button>`;
 }
 

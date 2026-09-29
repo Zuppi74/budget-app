@@ -622,12 +622,22 @@ body {
   margin-left: 4px;
 }
 
-.entry-week-sums {
+.entry-week-left {
   display: flex;
-  gap: 10px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  min-width: 0;
+}
+
+.entry-week-income,
+.entry-week-expense {
   font-weight: 600;
   white-space: nowrap;
 }
+
+/* Ausgaben immer rechtsbündig, auch wenn die Woche keine Einnahmen hat. */
+.entry-week-expense { margin-left: auto; }
 
 .entry-week-expense { color: var(--expense); }
 .entry-week-income { color: var(--income); }
