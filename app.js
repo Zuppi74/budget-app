@@ -124,7 +124,7 @@ const state = {
   currentType: 'expense',
   view: 'overview',
   entryFilters: { text: '', dateFrom: '', dateTo: '', categoryGroup: 'all', category: 'all', account: 'all', label: 'all' },
-  collapsedWeeks: new Set()
+  expandedWeeks: new Set()
 };
 
 function structuredCloneData(obj) {
@@ -163,6 +163,8 @@ function normalizeData(d) {
   d.forecast = d.forecast || { positions: [] };
   d.forecast.positions = d.forecast.positions || [];
   d.savingsGoals = d.savingsGoals || [];
+  // Gruppen starten beim Laden/Import immer eingeklappt (nur Ansichtszustand).
+  (d.categoryGroups || []).forEach(g => { g.collapsed = true; });
   return ensureAccounts(d);
 }
 
@@ -564,7 +566,7 @@ function renderEntries(entries) {
   });
 
   container.innerHTML = weeks.map(({ info, entries: weekEntries }) => {
-    const collapsed = state.collapsedWeeks.has(info.key);
+    const collapsed = !state.expandedWeeks.has(info.key);
     return `
       <div class="entry-week${collapsed ? ' collapsed' : ''}" data-week="${info.key}">
         ${renderWeekHeader(info, weekEntries, collapsed)}
@@ -576,9 +578,9 @@ function renderEntries(entries) {
     header.addEventListener('click', () => {
       const week = header.closest('.entry-week');
       const key = week.dataset.week;
-      const collapsed = !state.collapsedWeeks.has(key);
-      if (collapsed) state.collapsedWeeks.add(key);
-      else state.collapsedWeeks.delete(key);
+      const collapsed = state.expandedWeeks.has(key);
+      if (collapsed) state.expandedWeeks.delete(key);
+      else state.expandedWeeks.add(key);
       week.classList.toggle('collapsed', collapsed);
       header.setAttribute('aria-expanded', String(!collapsed));
     });
